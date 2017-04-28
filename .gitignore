@@ -1,0 +1,4 @@
+*.nds
+*.exe
+mongoose.conf
+Code/Engine/col.lua

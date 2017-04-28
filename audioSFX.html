@@ -1,0 +1,81 @@
+
+<head>
+	<script src="code/formats/sdat.js"></script>
+	<script src="code/formats/swav.js"></script>
+	<script src="code/formats/swar.js"></script>
+	<script src="code/formats/sbnk.js"></script>
+	<script src="code/formats/sseq.js"></script>
+	<script src="code/formats/ssar.js"></script>
+	<script src="code/audio/sseqPlayer.js"></script>
+	<script src="code/audio/nitroAudio.js"></script>
+
+	<script>
+		files = {};
+		fileQuota = 1;
+		filesLoaded = 0;
+		window.onload = function(argument) {
+			loadFile("sound_data.sdat");
+		}
+
+		var i=0;
+		var last = null;
+		function init() {
+			nitroAudio.init(new sdat(files["sound_data.sdat"])); //89
+			//nitroAudio	.playSound(0);
+
+			play.addEventListener('click', function() {
+				if (last != null) nitroAudio.instaKill(last);
+				document.getElementById('seq').innerText = "Current SSEQ: "+i;
+				last = nitroAudio.playSound(i++, {}, 0);
+			})
+			/*
+			var ctx = new AudioContext();
+			test = new sdat(files["sound_data.sdat"]);
+			testAud = new SSEQPlayer(test.sections["$INFO"][0][5], test, ctx);
+
+			var elem = document.getElementById('play'),
+			  buf = ctx.createBuffer(1, 1, 44000);
+			  osc = ctx.createBufferSource();
+			  osc.buffer = buf;
+			osc.connect(ctx.destination);
+			if (osc.noteOn) osc.start = osc.noteOn;
+
+			play.addEventListener('click', function() {
+			  if (!osc.donezo) {
+			  	osc.start(0);
+			  	osc.donezo = true;
+			  }
+			  testAud.masterGain.disconnect();
+			  testAud = new SSEQPlayer(test.sections["$INFO"][0][++i], test, ctx);//.arc.entries[++i]
+			  document.getElementById('seq').innerText = "Current SSEQ: "+i;
+			}, false);
+			*/
+
+			setInterval(tick, 16);
+		}
+
+		function tick() {
+			nitroAudio.tick();
+		}
+
+		function loadFile(url) {
+			var xml = new XMLHttpRequest();
+			xml.open("GET", url, true);
+			xml.responseType = "arraybuffer";
+			xml.onload = function() {
+				files[url] = xml.response;
+				if (++filesLoaded == fileQuota) init();
+			}
+			xml.send();
+		}
+
+		window.onerror = function(msg, ln, test) {
+			alert("ERROR: "+msg+", "+ln+", "+test);
+		}
+	</script>
+</head>
+<body>
+<button id="play" style="width:200px; height:40px;">Click to play next sequence</button>
+<span id="seq">Current SSEQ: 0</span>
+
+</body>
