@@ -1,6 +1,6 @@
 # mkjs
 ![mkscrn2s](https://cloud.githubusercontent.com/assets/6294155/25496279/34c8808c-2b78-11e7-90ee-b0d1350244bb.png)
-**mkjs** is an experimantal javascript engine reimplemention of Mario Kart DS. Users of the application must provide their own Mario Kart DS ROM, dumped using a DS or 3DS. This project exists for entirely educational purposes.
+**mkjs** is an experimental javascript engine reimplemention of Mario Kart DS. Users of the application must provide their own Mario Kart DS ROM, dumped using a DS or 3DS. This project exists for entirely educational purposes.
 
 I'll post a demo link here when you can just slam a ROM in using a basic file selector.
 
