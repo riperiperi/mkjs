@@ -35,7 +35,7 @@ window.fileStore = new (function(){
 			alert("Fatal database error!");
 		};
 		request.onsuccess = function(event) {
-			if (request.result == null) downloadGame("Mario Kart DS.nds", callback);
+			if (request.result == null) downloadGame(null, callback);
 			else callback(request.result.data);
 		};
 	}
