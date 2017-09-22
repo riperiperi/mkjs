@@ -3,7 +3,7 @@
 **mkjs** is an experimental javascript engine reimplemention of Mario Kart DS. Users of the application must provide their own Mario Kart DS ROM, dumped using a DS or 3DS. This project exists for entirely educational purposes.
 
 If you have a ROM of MKDS available, you can give mkjs a shot here:
-http://rhy3756547.github.io/mkjs
+http://riperiperi.github.io/mkjs
 
 # Purpose
 I started working on mkjs a few years ago to get a better grasp on a lot things, mainly for fun. Here are the key factors:
@@ -31,6 +31,7 @@ The base game mostly works. A lot of the grunt work is done - the current setup 
 - UI engine
 - Race Logic (checkpoints, lap count, lap tracking, race completion...)
 - All course obstacles (enemies, bridge in delfino)
+- All road collision types (loop, sticky not yet implemented)
 - Items & damage
 - Particle effects format reader and renderer (no idea how these formats work).
 - Custom Menus
