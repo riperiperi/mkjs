@@ -43,6 +43,7 @@ window.IngameRes = function(rom) {
 	var characters = [];
 	var karts = [];
 
+	var test = new spa(r.MainEffect.getFile("RaceEffect.spa"));
 	loadItems();
 	loadTires();
 
