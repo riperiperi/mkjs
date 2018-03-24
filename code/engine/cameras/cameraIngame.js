@@ -52,7 +52,7 @@ window.cameraIngame = function(kart) {
 		var dist = 192;
 		this.targetShadowPos = vec3.add([], kart.pos, [Math.sin(kart.angle)*dist, 0, -Math.cos(kart.angle)*dist])
 
-		thisObj.view = {p:p, mv:mat};
+		thisObj.view = {p:p, mv:mat, pos: vec3.scale([], vec3.transformMat4([], [0,0,0], mat4.invert([], mat)), 1024)};
 
 		return thisObj.view;
 	}

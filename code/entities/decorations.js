@@ -179,7 +179,7 @@ window.ObjDecor = function(obji, scene) {
 				forceBill = false;
 				return {mdl:[{nsbmd:"choropu.nsbmd"}], other:[null, null, "choropu.nsbtp"]}; //has nsbtp
 			case 0x019B: //cheep cheep (bouncing)
-				return {mdl:[{nsbmd:"pukupuku.nsbmd"}], other:[null, null, "pukupuku.nsbtp"]}; //has nsbtp
+				return {mdl:[{nsbmd:"pukupuku.nsbmd"}]}; //has nsbtp //, other:[null, null, "pukupuku.nsbtp"]
 			case 0x019D: //snowman
 				return {mdl:[{nsbmd:"sman_top.nsbmd"}, {nsbmd:"sman_bottom.nsbmd"}]};
 			case 0x019E: //trunk with bats

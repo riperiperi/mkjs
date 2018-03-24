@@ -102,7 +102,7 @@ window.cameraIntro = function() {
 		
 		thisObj.targetShadowPos = lookAtPos;
 
-		return {p:p, mv:mat}
+		return {p:p, mv:mat, pos: vec3.scale([], vec3.transformMat4([], [0,0,0], mat4.invert([], mat)), 1024)}
 	}
 
 	var initCam = function(scene, came) {

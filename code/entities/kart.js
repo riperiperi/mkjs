@@ -95,9 +95,18 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	this.lastInput = null;
 
 	//race statistics
-	this.lapNumber = 0;
+	this.lapNumber = 1;
 	this.passedKTP2 = false;
 	this.checkPointNumber = 0;
+
+	this.wheelParticles = [
+		new NitroEmitter(scene, k, -1, [1, 1.5, -1]),
+		new NitroEmitter(scene, k, -1, [-1, 1.5, -1])
+		];
+
+	scene.particles.push(this.wheelParticles[0]);
+	scene.particles.push(this.wheelParticles[1]);
+
 	var nkm = scene.nkm;
 	var startLine = nkm.sections["KTPS"].entries[0];
 	var passLine = nkm.sections["KTP2"].entries[0];
@@ -193,6 +202,10 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			mat4.scale(wmat, wmat, [scale, scale, scale]);
 			if (i<2) mat4.rotateY(wmat, wmat, ((k.driveAnimF-14)/14)*Math.PI/6);
 			mat4.rotateX(wmat, wmat, wheelTurn);
+
+			if (i>1) {
+				k.wheelParticles[i-2].offset = vec3.scale(k.wheelParticles[i-2].offset, vec3.add(k.wheelParticles[i-2].offset, offsets.wheels[i], [0, -params.colRadius, 0]), 1/16);
+			}
 		}
 
 		var scale = 16;
@@ -262,7 +275,11 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		drawChar(view, pMatrix);
 	}
 
+
+	k.lWheelParticle = null;
+
 	function update(scene) {
+
 		var lastPos = vec3.clone(k.pos);
 		updateMat = true;
 
@@ -314,7 +331,8 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			sounds.boost = null;
 		}
 
-		if (onGround && k.speed > 0.5) {
+		var isMoving = onGround && k.speed > 0.5;
+		if (isMoving) {
 			if (lastCollided != sounds.lastTerrain || lastBE != sounds.lastBE || sounds.drive == null) {
 				if (sounds.drive != null) nitroAudio.kill(sounds.drive);
 				if (lastColSounds.drive != null) {
@@ -337,7 +355,10 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		} else {
 			if (sounds.drift != null) { nitroAudio.kill(sounds.drift); sounds.drift = null; }
 			if (sounds.drive != null) { nitroAudio.kill(sounds.drive); sounds.drive = null; }
+
 		}
+		k.wheelParticles[0].pause = !isMoving;
+		k.wheelParticles[1].pause = !isMoving;
 
 		//end sound update
 
@@ -346,23 +367,40 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		} else if (k.cannon != null) { //when cannon is active, we fly forward at max move speed until we get to the cannon point.
 			var c = scene.nkm.sections["KTPC"].entries[k.cannon];
 
-			var mat = mat4.create();
-			mat4.rotateY(mat, mat, c.angle[1]*(Math.PI/180));
-			mat4.rotateX(mat, mat, c.angle[0]*(-Math.PI/180));
+			if (c.id2 != 0) {
+				var c2 = scene.nkm.sections["KTPC"].entries[c.id2];
+				c = c2;
 
-			var forward = [0, 0, 1];
-			var up = [0, 1, 0];
+				var mat = mat4.create();
+				mat4.rotateY(mat, mat, c.angle[1]*(Math.PI/180));
+				mat4.rotateX(mat, mat, c.angle[0]*(-Math.PI/180));
 
-			k.vel = vec3.scale([], vec3.transformMat4(forward, forward, mat), MAXSPEED);
-			k.speed = MAXSPEED;
-			vec3.add(k.pos, k.pos, k.vel);
-			k.physicalDir = (180-c.angle[1])*(Math.PI/180);
-			k.angle = k.physicalDir;
-			k.kartTargetNormal = vec3.transformMat4(up, up, mat);
+				k.pos = vec3.clone(c2.pos);
+				vec3.add(k.pos, k.pos, vec3.transformMat4([], [0,16,16], mat));
 
-			var planeConst = -vec3.dot(c.pos, forward);
-			var cannonDist = vec3.dot(k.pos, forward) + planeConst;
-			if (cannonDist > 0) k.cannon = null;
+				k.physicalDir = (180-c2.angle[1])*(Math.PI/180);
+				k.angle = k.physicalDir;
+				k.cannon = null;
+			} else {
+
+				var mat = mat4.create();
+				mat4.rotateY(mat, mat, c.angle[1]*(Math.PI/180));
+				mat4.rotateX(mat, mat, c.angle[0]*(-Math.PI/180));
+
+				var forward = [0, 0, 1];
+				var up = [0, 1, 0];
+
+				k.vel = vec3.scale([], vec3.transformMat4(forward, forward, mat), MAXSPEED);
+				k.speed = Math.min(k.speed+1, MAXSPEED);
+				vec3.add(k.pos, k.pos, k.vel);
+				k.physicalDir = (180-c.angle[1])*(Math.PI/180);
+				k.angle = k.physicalDir;
+				k.kartTargetNormal = vec3.transformMat4(up, up, mat);
+
+				var planeConst = -vec3.dot(c.pos, forward);
+				var cannonDist = vec3.dot(k.pos, forward) + planeConst;
+				if (cannonDist > 0) k.cannon = null;
+			}
 		} else { //default kart mode
 
 			var groundEffect = 0;
@@ -402,6 +440,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				if ((onGround) && !(input.accel && input.drift && (k.speed > 2 || !k.driftLanded))) {
 					//end drift, execute miniturbo
 					k.drifting = false;
+					clearWheelParticles();
 					if (sounds.powerslide != null) {
 						nitroAudio.instaKill(sounds.powerslide);
 						sounds.powerslide = null;
@@ -434,11 +473,15 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 				if (onGround) {
 					if (!k.driftLanded) {
-						if (k.driftMode == 0) k.drifting = false;
+						if (k.driftMode == 0) {
+							k.drifting = false;
+							clearWheelParticles();
+						}
 						else {
 							k.driftPSMode = 0;
 							k.driftPSTick = 0;
 							k.driftLanded = true;
+							if (k.drifting) setWheelParticles(20, 1); //20 = smoke, 1 = drift priority
 						}
 					}
 					if (k.drifting) {
@@ -467,7 +510,8 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 										k.driftPSMode++;
 										k.driftPSTick = 1;
 
-										//play blue spark sound
+										//play blue spark sound, flare
+										setWheelParticles(126, 2); //126 = blue flare, 2 = flare priority
 										var blue = nitroAudio.playSound(210, {}, 0, k);
 										blue.gainN.gain.value = 2;
 
@@ -487,6 +531,8 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 										k.driftPSMode++;
 										k.driftPSTick = 1;
 										//play red sparks sound, full MT!
+										setWheelParticles(22, 2); //22 = red flare, 2 = flare priority
+										setWheelParticles(17, 1); //17 = red mt, 1 = drift priority
 										sounds.powerslide = nitroAudio.playSound(209, {}, 0, k);
 										sounds.powerslide.gainN.gain.value = 2;
 									} else k.driftPSTick = 0;
@@ -642,6 +688,24 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		positionChanged(lastPos, k.pos);
 	}
 
+	function clearWheelParticles(prio) {
+		for (let i=0; i<2; i++) {
+			if (prio == null) {
+				//clear all specials
+				k.wheelParticles[i].clearEmitter(1); //drift mode
+				//k.wheelParticles[i].clearEmitter(2); //drift flare (blue mt, red big flash)
+			} else {
+				k.wheelParticles[i].clearEmitter(0);
+			}
+		}
+	}
+
+	function setWheelParticles(id, prio) {
+		for (let i=0; i<2; i++) {
+			k.wheelParticles[i].setEmitter(id, prio);
+		}
+	}
+
 	function genFutureChecks() {
 		//all future points that 
 		var chosen = {}
@@ -661,6 +725,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 	function positionChanged(oldPos, pos) {
 		//crossed into new checkpoint?
+		if (checkpoints.length == 0) return;
 		for (var i=0; i<futureChecks.length; i++) {
 			var check = checkpoints[futureChecks[i]];
 			var distOld = vec2.sub([], [check.x1, check.z1], [oldPos[0], oldPos[2]]);
@@ -685,6 +750,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				k.lapNumber++;
 				k.checkPointNumber = 0;
 				k.passedKTP2 = 0;
+				futureChecks = [1];
 				scene.lapAdvance(k);
 			}
 		}
@@ -805,6 +871,11 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		return MKDS_COLTYPE.SOUNDMAP[collision][effect] || {};
 	}
 
+	function colParticle(collision, effect) {
+		if (MKDS_COLTYPE.SOUNDMAP[collision] == null) return null
+		return MKDS_COLTYPE.SOUNDMAP[collision][effect].particle || null;
+	}
+
 	function project(u, v) {
 		return vec3.scale([], u, (vec3.dot(u, v)/vec3.dot(u, u)))
 	}
@@ -815,6 +886,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		var colType = (plane.CollisionType>>8)&31;
 		var colBE = (plane.CollisionType>>5)&7;
 
+		var change = (colType != lastCollided);
 		lastCollided = colType;
 		lastBE = colBE;
 		lastColSounds = colSound(lastCollided, colBE);
@@ -832,8 +904,13 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 			if (proj < -1) { 
 				if (lastColSounds.hit != null) nitroAudio.playSound(lastColSounds.hit, {volume:1}, 0, k) 
+				var colObj = {pos:pos, vel:[0,0,0], mat: mat4.fromTranslation([], pos)};
+				scene.particles.push(new NitroEmitter(scene, colObj, 13));
+				scene.particles.push(new NitroEmitter(scene, colObj, 14));
 			}
 			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), adjN, proj));
+
+			
 
 			//convert back to angle + speed to keep change to kart vel
 
@@ -851,6 +928,14 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			if (proj < -4 && k.vel[1] < -2) { proj -= 1.5; }
 			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), n, proj));
 			k.kartTargetNormal = dat.pNormal;
+
+			if (change) {
+				var particle = colParticle(lastCollided, colBE);
+				if (particle == null)
+					clearWheelParticles(0);
+				else
+					setWheelParticles(particle, 0);
+			}
 			if (!onGround) {
 				console.log("ground: "+colType+", "+colBE);
 				groundAnim = 0;

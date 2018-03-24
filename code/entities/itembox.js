@@ -45,6 +45,7 @@ window.ItemBox = function(obji, scene) {
 						for (var j=0; j<10; j++) {
 							scene.particles.push(new ItemShard(scene, ok, res.mdl[2]));
 						}
+						scene.particles.push(new NitroEmitter(scene, ok, 47));
 						t.mode = 1;
 						t.time = 0;
 						break;

@@ -246,10 +246,9 @@ window.nitroRender = new function() {
 
 		gl.uniformMatrix4fv(shader.shadowMatUniform, false, sMat);
 		gl.uniformMatrix4fv(shader.farShadowMatUniform, false, fsMat);
+		gl.uniform1f(shader.lightIntensityUniform, 0.3);
 
-		gl.uniform1f(shader.shadOffUniform, 0.00005+((mobile)?0.0005:0));
-		gl.uniform1f(shader.farShadOffUniform, 0.0005);
-
+		this.resetShadOff();
 		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, sTex);
 		gl.uniform1i(shader.lightSamplerUniform, 1);
@@ -260,6 +259,12 @@ window.nitroRender = new function() {
 
 		this.setColMult([1, 1, 1, 1]);
 		this.prepareShader();
+	}
+
+	this.resetShadOff = function() {
+		var shader = shaders[1];
+		gl.uniform1f(shader.shadOffUniform, 0.00005+((mobile)?0.0005:0));
+		gl.uniform1f(shader.farShadOffUniform, 0.0005);
 	}
 
 	this.unsetShadowMode = function() {
@@ -384,7 +389,7 @@ function nitroModel(bmd, btx, remap) {
 	}
 
 	if (remap != null) {
-		setTextureRemap(remap)
+		setTextureRemap(remap);
 	}
 
 	if (btx != null) {

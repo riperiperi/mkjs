@@ -18,6 +18,7 @@ window.IngameRes = function(rom) {
 
 	this.Race = new narc(lz77.decompress(rom.getFile("/data/Scene/Race.carc"))); //contains lakitu, count, various graphics
 	this.RaceLoc = new narc(lz77.decompress(rom.getFile("/data/Scene/Race_us.carc"))); //contains lakitu lap signs, START, YOU WIN etc. some of these will be replaced by hi res graphics by default.
+	this.RaceEffect = new spa(r.MainEffect.getFile("RaceEffect.spa"));
 
 	this.MainFont = new nftr(r.Main2D.getFile("marioFont.NFTR"));
 	//debugger;
@@ -43,7 +44,6 @@ window.IngameRes = function(rom) {
 	var characters = [];
 	var karts = [];
 
-	var test = new spa(r.MainEffect.getFile("RaceEffect.spa"));
 	loadItems();
 	loadTires();
 

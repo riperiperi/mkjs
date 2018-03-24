@@ -102,10 +102,14 @@ window.controlRaceCPU = function(nkm) {
 			//advance to one of next possible paths
 			
 			if (battleMode) {
-				var pathInd = ((Math.random()>0.5 && ePath.source.length>0)?ePath.source:ePath.dest)[Math.floor(Math.random()*ePath.dest.length)];
+				var loc = (Math.random()>0.5 && ePath.source.length>0)?ePath.source:ePath.dest;
+				var pathInd = loc[Math.floor(Math.random()*loc.length)];
 				ePoiInd = pathInd;
-				ePoi = points[ePoiInd];
-				recomputePath();
+				var pt = points[ePoiInd];
+				if (pt != null) {
+					ePoi = pt;
+					recomputePath();
+				}
 			} else {
 				var pathInd = ePath.dest[Math.floor(Math.random()*ePath.dest.length)];
 				ePath = paths[pathInd];
