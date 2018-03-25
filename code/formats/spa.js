@@ -38,7 +38,7 @@ window.spa = function(input) {
         offset += 24;
         if (version == "12_1") {
             t.particles = [];
-            for (let i=0; i<particleCount; i++) {
+            for (var i=0; i<particleCount; i++) {
                 t.particles[i] = readParticle(view, offset);
                 t.particles[i].parent = t;
                 offset = t.particles[i].nextOff;
@@ -47,14 +47,14 @@ window.spa = function(input) {
 
         offset = firstTexOffset;
         t.particleTextures = [];
-        for (let i=0; i<particleTexCount; i++) {
+        for (var i=0; i<particleTexCount; i++) {
             t.particleTextures[i] = readParticleTexture(view, offset);
             offset = t.particleTextures[i].nextOff;
         }
 
         //window.debugParticle = true;
         if (window.debugParticle) {
-            for (let i=0; i<particleCount; i++) {
+            for (var i=0; i<particleCount; i++) {
                 var text = document.createElement("textarea");
                 var p = t.particles[i];
                 p.parent = null;
@@ -272,7 +272,7 @@ window.spa = function(input) {
         if ((obj.flag & ParticleFlags.TextureAnimation) != 0)
         {
             var textures = [];
-            for (let i=0; i<8; i++) textures[i] = view.getUint8(off+i);
+            for (var i=0; i<8; i++) textures[i] = view.getUint8(off+i);
             obj.texAnim = {
                 textures: textures,
                 frames: view.getUint8(off+8),
@@ -284,7 +284,7 @@ window.spa = function(input) {
         if ((obj.flag & ParticleFlags.Bit16) != 0)
         {
             obj.Bit16 = [];
-            for (let i=0; i<20; i++) obj.Bit16[i] = view.getUint8(off+i);
+            for (var i=0; i<20; i++) obj.Bit16[i] = view.getUint8(off+i);
             off += 20;
         }
         if ((obj.flag & ParticleFlags.Gravity) != 0)
@@ -308,31 +308,31 @@ window.spa = function(input) {
         {
             //seems to be 4 int 16s typically in some kind of pattern.
             obj.Bit25 = [];
-            for (let i=0; i<8; i++) obj.Bit25[i] = view.getUint8(off+i);
+            for (var i=0; i<8; i++) obj.Bit25[i] = view.getUint8(off+i);
             off += 8;
         }
         if ((obj.flag & ParticleFlags.Bit26) != 0)
         {
             obj.Bit26 = [];
-            for (let i=0; i<16; i++) obj.Bit26[i] = view.getUint8(off+i);
+            for (var i=0; i<16; i++) obj.Bit26[i] = view.getUint8(off+i);
             off += 16;
         }
         if ((obj.flag & ParticleFlags.Bit27) != 0)
         {
             obj.Bit27 = [];
-            for (let i=0; i<4; i++) obj.Bit27[i] = view.getUint8(off+i);
+            for (var i=0; i<4; i++) obj.Bit27[i] = view.getUint8(off+i);
             off += 4;
         }
         if ((obj.flag & ParticleFlags.Bit28) != 0)
         {
             obj.Bit28 = [];
-            for (let i=0; i<8; i++) obj.Bit28[i] = view.getUint8(off+i);
+            for (var i=0; i<8; i++) obj.Bit28[i] = view.getUint8(off+i);
             off += 8;
         }
         if ((obj.flag & ParticleFlags.Bit29) != 0)
         {
             obj.Bit29 = [];
-            for (let i=0; i<16; i++) obj.Bit29[i] = view.getUint8(off+i);
+            for (var i=0; i<16; i++) obj.Bit29[i] = view.getUint8(off+i);
             off += 16;
         }
 

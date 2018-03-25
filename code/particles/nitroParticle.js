@@ -88,8 +88,8 @@ window.NitroParticle = function(scene, emitter, pos, vel, dir, dirVel, duration,
     function draw(view, pMatrix, gl) {
         var particlePct = t.time / t.duration;
 
-        let pos = t.pos;
-        let vel = t.vel;
+        var pos = t.pos;
+        var vel = t.vel;
 
         if (t.attached != null) {
             pos = vec3.transformMat4([], pos, t.attached.mat);
