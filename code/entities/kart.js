@@ -72,6 +72,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 	this.kartColVel = vec3.create();
 	this.kartColTimer = 0;
+	this.kartWallTimer = 0;
 
 	var charRes = scene.gameRes.getChar(charN);
 	var kartRes = scene.gameRes.getKart(kartN);
@@ -98,6 +99,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	this.lapNumber = 1;
 	this.passedKTP2 = false;
 	this.checkPointNumber = 0;
+	this.OOB = 0;
 
 	this.wheelParticles = [
 		new NitroEmitter(scene, k, -1, [1, 1.5, -1]),
@@ -111,7 +113,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	var startLine = nkm.sections["KTPS"].entries[0];
 	var passLine = nkm.sections["KTP2"].entries[0];
 	var checkpoints = nkm.sections["CPOI"].entries;
-	var respawns = nkm.sections["CPOI"].entries;
+	var respawns = nkm.sections["KTPJ"].entries;
 	var futureChecks = [1];
 
 	var hitGroundAnim = [ //length 13, on y axis
@@ -403,6 +405,17 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			}
 		} else { //default kart mode
 
+			if (k.OOB > 0) {
+				var current = checkpoints[k.checkPointNumber];
+				var respawn = respawns[current.respawn];
+				k.physicalDir = (180-respawn.angle[1])*(Math.PI/180);
+				k.angle = k.physicalDir;
+				k.speed = 0;
+				k.vel = vec3.create();
+				k.pos = vec3.clone(respawn.pos);
+				if (k.controller.setRouteID != null) k.controller.setRouteID(respawn.id1);
+				k.OOB = 0;
+			}
 			var groundEffect = 0;
 			if (lastCollided != -1) {
 				groundEffect = MKDS_COLTYPE.PHYS_MAP[lastCollided];
@@ -608,6 +621,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 			if (!onGround) {
 				this.kartTargetNormal = [0, 1, 0];
+				if (k.physBasis != null) vec3.transformMat4(this.kartTargetNormal,this.kartTargetNormal,k.physBasis.mat);
 				vec3.add(k.vel, k.vel, k.gravity)
 				if (k.ylock >= 0) {
 					ylvel += k.gravity[1];
@@ -630,6 +644,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			}
 
 			if (k.kartColTimer > 0) k.kartColTimer--;
+			if (k.kartWallTimer > 0) k.kartWallTimer--;
 
 			wheelTurn += k.speed/16;
 			wheelTurn = fixDir(wheelTurn);
@@ -648,7 +663,15 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 			var steps = 0;
 			var remainingT = 1;
-			var velSeg = vec3.clone(k.vel);
+			var baseVel = k.vel;
+			if (k.physBasis != null) {
+				if (k.physBasis.time-- < 0) exitBasis();
+				else {
+					baseVel = vec3.transformMat4([], baseVel, k.physBasis.mat);
+					k.vel[1] = -1;
+				}
+			}
+			var velSeg = vec3.clone(baseVel);
 			var posSeg = vec3.clone(k.pos);
 			var ignoreList = [];
 			while (steps++ < 10 && remainingT > 0.01) {
@@ -657,7 +680,10 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 					colResponse(posSeg, velSeg, result, ignoreList)
 					remainingT -= result.t;
 					if (remainingT > 0.01) {
-						velSeg = vec3.scale(vec3.create(), k.vel, remainingT);
+						if (k.physBasis != null) {
+							baseVel = vec3.transformMat4([], k.vel, k.physBasis.mat);
+						}
+						velSeg = vec3.scale(vec3.create(), baseVel, remainingT);
 					}
 				} else {
 					vec3.add(posSeg, posSeg, velSeg);
@@ -834,7 +860,13 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	function buildBasis() {
 		//order y, x, z
 		var dir = k.physicalDir+k.driftOff+(Math.sin((COLBOUNCE_TIME-k.kartColTimer)/3)*(Math.PI/6)*(k.kartColTimer/COLBOUNCE_TIME));
-		var basis = gramShmidt(k.kartNormal, [Math.cos(dir), 0, Math.sin(dir)], [Math.sin(dir), 0, -Math.cos(dir)]);
+		var forward = [Math.sin(dir), 0, -Math.cos(dir)];
+		var side = [Math.cos(dir), 0, Math.sin(dir)];
+		if (k.physBasis != null) {
+			vec3.transformMat4(forward, forward, k.physBasis.mat);
+			vec3.transformMat4(side, side, k.physBasis.mat);
+		}
+		var basis = gramShmidt(k.kartNormal, side, forward);
 		var temp = basis[0];
 		basis[0] = basis[1];
 		basis[1] = temp; //todo: cleanup
@@ -845,6 +877,56 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			0, 0, 0, 1			
 		]
 
+	}
+
+	function enterBasis(normal) {
+		//establish a new basis for the kart velocity based on this normal.
+		//used by looping and sticky track surface types.
+
+		//first let's get the forward direction in our current basis
+
+		var dir = k.angle;
+		var forward, side;
+		if (k.physBasis != null) {
+			forward = vec3.transformMat4([], [-	Math.sin(dir), 0, Math.cos(dir)], k.physBasis.mat);
+			side = vec3.transformMat4([], [Math.cos(dir), 0, Math.sin(dir)], k.physBasis.mat);
+		} else {
+			forward = [-Math.sin(dir), 0, Math.cos(dir)];
+			side = [Math.cos(dir), 0, Math.sin(dir)];
+		}
+		
+		var basis = gramShmidt(normal, side, forward);
+		var temp = basis[0];
+		basis[0] = basis[1];
+		basis[1] = temp; //todo: cleanup
+		var m4 = [
+			basis[0][0], basis[0][1], basis[0][2], 0,
+			basis[1][0], basis[1][1], basis[1][2], 0,
+			basis[2][0], basis[2][1], basis[2][2], 0,
+			0, 0, 0, 1			
+		];
+
+		k.physicalDir = dirDiff(k.physicalDir, k.angle);
+		k.angle = 0; //our front direction is now aligned with z.
+		k.vel = [Math.sin(k.angle)*k.speed, k.vel[1], -Math.cos(k.angle)*k.speed];
+
+		k.physBasis = {
+			mat: m4,
+			inv: mat4.invert([], m4),
+			time: 15,
+			loop: false
+		};
+	}
+
+	function exitBasis() {
+		//return to a normal y up, z forward basis.
+
+		var v = vec3.transformMat4([], k.vel, k.physBasis.mat);
+		k.physicalDir = dirDiff(k.physicalDir, k.angle);
+		k.angle = Math.atan2(v[0], -v[2]);
+		k.physicalDir += k.angle;
+		k.vel = v;
+		k.physBasis = null;
 	}
 
 	function sndUpdate(view) {
@@ -892,24 +974,34 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		lastColSounds = colSound(lastCollided, colBE);
 
 		var n = vec3.normalize([], dat.normal);
+		var an = n;
+		if (k.physBasis != null) {
+			an = vec3.transformMat4([], n, k.physBasis.inv);
+		}
 		var gravS = Math.sqrt(vec3.dot(k.gravity, k.gravity));
 		var angle = Math.acos(vec3.dot(vec3.scale(vec3.create(), k.gravity, -1/gravS), n));
 		var adjustPos = true;
 
+		if (colType == MKDS_COLTYPE.OOB || colType == MKDS_COLTYPE.FALL) {
+			k.OOB = 1;
+		}
+
 		if (MKDS_COLTYPE.GROUP_WALL.indexOf(colType) != -1) { //wall
 			//sliding plane, except normal is transformed to be entirely on the xz plane (cannot ride on top of wall, treated as vertical)
-			var xz = Math.sqrt(n[0]*n[0]+n[2]*n[2])
-			var adjN = [n[0]/xz, 0, n[2]/xz]
+			var xz = Math.sqrt(an[0]*an[0]+an[2]*an[2])
+			var adjN = [an[0]/xz, 0, an[2]/xz]
 			var proj = vec3.dot(k.vel, adjN);
 
 			if (proj < -1) { 
-				if (lastColSounds.hit != null) nitroAudio.playSound(lastColSounds.hit, {volume:1}, 0, k) 
-				var colObj = {pos:pos, vel:[0,0,0], mat: mat4.fromTranslation([], pos)};
-				scene.particles.push(new NitroEmitter(scene, colObj, 13));
-				scene.particles.push(new NitroEmitter(scene, colObj, 14));
+				if (k.kartWallTimer == 0) {
+					if (lastColSounds.hit != null) nitroAudio.playSound(lastColSounds.hit, {volume:1}, 0, k) 
+					var colObj = {pos:pos, vel:[0,0,0], mat: mat4.fromTranslation([], pos)};
+					scene.particles.push(new NitroEmitter(scene, colObj, 13));
+					scene.particles.push(new NitroEmitter(scene, colObj, 14));
+				}
+				k.kartWallTimer = 15;
 			}
-			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), adjN, proj));
-
+			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), adjN, proj)); 
 			
 
 			//convert back to angle + speed to keep change to kart vel
@@ -923,10 +1015,21 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				k.boostNorm = BOOSTTIME;
 			}
 
+			var stick = (colType == MKDS_COLTYPE.STICKY || colType == MKDS_COLTYPE.LOOP); 
+
 			if (k.vel[1] > 0) k.vel[1] = 0;
-			var proj = vec3.dot(k.vel, n);
-			if (proj < -4 && k.vel[1] < -2) { proj -= 1.5; }
-			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), n, proj));
+			var proj = vec3.dot(k.vel, an);
+			if (!stick && proj < -4 && k.vel[1] < -2) { proj -= 1.5; }
+			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), an, proj));
+
+			if (stick) {
+				enterBasis(dat.pNormal);
+				k.physBasis.loop = colType == MKDS_COLTYPE.LOOP;
+			} else {
+				if (k.physBasis != null)
+					exitBasis();
+			}
+
 			k.kartTargetNormal = dat.pNormal;
 
 			if (change) {
@@ -937,7 +1040,6 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 					setWheelParticles(particle, 0);
 			}
 			if (!onGround) {
-				console.log("ground: "+colType+", "+colBE);
 				groundAnim = 0;
 				if (lastColSounds.land != null) nitroAudio.playSound(lastColSounds.land, {volume:1}, 0, k)
 			}
