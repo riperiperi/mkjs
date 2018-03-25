@@ -21,6 +21,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 	var params = scene.gameRes.kartPhys.karts[kartN];
 	var offsets = scene.gameRes.kartOff.karts[kartN];
+	this.wheelClass = (offsets.name[10] == "L")?2:((offsets.name[10] == "M")?1:0);
 
 	this.local = controller.local;
 	this.active = true;
@@ -66,6 +67,9 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	this.drawWheels = drawWheels;
 	this.drawChar = drawChar;
 
+	this.getPosition = getPosition;
+	this.playCharacterSound = playCharacterSound;
+
 	this.trackAttach = null; //a normal for the kart to attach to (loop)
 	this.boostMT = 0;
 	this.boostNorm = 0;
@@ -73,6 +77,10 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	this.kartColVel = vec3.create();
 	this.kartColTimer = 0;
 	this.kartWallTimer = 0;
+	this.charSoundTimer = 0;
+
+	this.placement = 0;
+	this.lastPlacement = 0;
 
 	var charRes = scene.gameRes.getChar(charN);
 	var kartRes = scene.gameRes.getKart(kartN);
@@ -206,7 +214,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			mat4.rotateX(wmat, wmat, wheelTurn);
 
 			if (i>1) {
-				k.wheelParticles[i-2].offset = vec3.scale(k.wheelParticles[i-2].offset, vec3.add(k.wheelParticles[i-2].offset, offsets.wheels[i], [0, -params.colRadius, 0]), 1/16);
+				k.wheelParticles[i-2].offset = vec3.scale(k.wheelParticles[i-2].offset, vec3.add(k.wheelParticles[i-2].offset, offsets.wheels[i], [k.wheelClass*(i-2.5)*-2, (-params.colRadius)-k.wheelClass*2, 0]), 1/16);
 			}
 		}
 
@@ -281,6 +289,15 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	k.lWheelParticle = null;
 
 	function update(scene) {
+		if (k.placement != k.lastPlacement) {
+			if (k.placement < k.lastPlacement) {
+				if (k.charSoundTimer == 0) {
+					playCharacterSound(5);
+					k.charSoundTimer = 60;
+				}
+			}
+			k.lastPlacement = k.placement;
+		}
 
 		var lastPos = vec3.clone(k.pos);
 		updateMat = true;
@@ -406,6 +423,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		} else { //default kart mode
 
 			if (k.OOB > 0) {
+				playCharacterSound(0);
 				var current = checkpoints[k.checkPointNumber];
 				var respawn = respawns[current.respawn];
 				k.physicalDir = (180-respawn.angle[1])*(Math.PI/180);
@@ -413,6 +431,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				k.speed = 0;
 				k.vel = vec3.create();
 				k.pos = vec3.clone(respawn.pos);
+				vec3.add(k.pos, k.pos, [0,16,0]);
 				if (k.controller.setRouteID != null) k.controller.setRouteID(respawn.id1);
 				k.OOB = 0;
 			}
@@ -645,6 +664,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 			if (k.kartColTimer > 0) k.kartColTimer--;
 			if (k.kartWallTimer > 0) k.kartWallTimer--;
+			if (k.charSoundTimer > 0) k.charSoundTimer--;
 
 			wheelTurn += k.speed/16;
 			wheelTurn = fixDir(wheelTurn);
@@ -714,8 +734,27 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		positionChanged(lastPos, k.pos);
 	}
 
+	function playCharacterSound(sound, volume) {
+		//0 - hit
+		//1 - hit spin
+		//2 - hit ?? hit grnd
+		//3 - hit banana? race start?
+		//4 - hit spin?
+		//5 - good pass?
+		//6 - good OK!
+		//7 - use item
+		//8 - hit someone?
+		//9 = win
+		//10 = alright
+		//11 = bad
+		//12 = good record
+		//13 = bad record
+		if (volume == null) volume = 1;
+		nitroAudio.playSound(sound + charRes.sndOff, {volume: 2*volume}, 2, k);
+	}
+
 	function clearWheelParticles(prio) {
-		for (let i=0; i<2; i++) {
+		for (var i=0; i<2; i++) {
 			if (prio == null) {
 				//clear all specials
 				k.wheelParticles[i].clearEmitter(1); //drift mode
@@ -727,7 +766,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	}
 
 	function setWheelParticles(id, prio) {
-		for (let i=0; i<2; i++) {
+		for (var i=0; i<2; i++) {
 			k.wheelParticles[i].setEmitter(id, prio);
 		}
 	}
@@ -780,6 +819,15 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				scene.lapAdvance(k);
 			}
 		}
+	}
+
+	function getPosition() {
+		if (futureChecks.length == 0) return 0;
+		var check = checkpoints[futureChecks[0]];
+		var dist = vec2.sub([], [check.x1, check.z1], [k.pos[0], k.pos[2]]);
+		var dot = vec2.dot(dist, [check.sinus, check.cosinus]);
+
+		return k.checkPointNumber + (1-(Math.abs(dot)/(0xFFFF))) + k.lapNumber*checkpoints.length;
 	}
 
 	function forwardCrossedKTP(ktp, oldPos, pos) {
@@ -1039,7 +1087,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				else
 					setWheelParticles(particle, 0);
 			}
-			if (!onGround) {
+			if (!onGround && !stick) {
 				groundAnim = 0;
 				if (lastColSounds.land != null) nitroAudio.playSound(lastColSounds.land, {volume:1}, 0, k)
 			}
