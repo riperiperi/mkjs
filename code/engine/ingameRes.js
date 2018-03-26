@@ -18,6 +18,7 @@ window.IngameRes = function(rom) {
 
 	this.Race = new narc(lz77.decompress(rom.getFile("/data/Scene/Race.carc"))); //contains lakitu, count, various graphics
 	this.RaceLoc = new narc(lz77.decompress(rom.getFile("/data/Scene/Race_us.carc"))); //contains lakitu lap signs, START, YOU WIN etc. some of these will be replaced by hi res graphics by default.
+	this.RaceEffect = new spa(r.MainEffect.getFile("RaceEffect.spa"));
 
 	this.MainFont = new nftr(r.Main2D.getFile("marioFont.NFTR"));
 	//debugger;
@@ -30,20 +31,25 @@ window.IngameRes = function(rom) {
 		"koura_w" /*blue shell item rep*/, "f_box", "killer" /*bullet bill*/
 	]
 
+	//order
+	//donkey, toad, bowser?, luigi, mario, peach, wario, yoshi, daisy, waluigi, dry bones (karon), robo, heyho
+	var toSoundOff = [
+		4, 0, 1, 2, 5, 6, 7, 3, 10, 8, 9, 11, 12
+	];
+
 	var charNames = [
 		"mario", "donkey", "kinopio", "koopa", "peach", "wario", "yoshi", "luigi", "karon", "daisy", "waluigi", "robo", "heyho"
-	]
+	];
 
 	var charAbbrv = [
 		"MR", "DK", "KO", "KP", "PC", "WR", "YS", "LG", "KA", "DS", "WL", "RB", "HH"
-	]
+	];
 
 	var tireName = ["kart_tire_L", "kart_tire_M", "kart_tire_S"];
 
 	var characters = [];
 	var karts = [];
 
-	var test = new spa(r.MainEffect.getFile("RaceEffect.spa"));
 	loadItems();
 	loadTires();
 
@@ -75,6 +81,7 @@ window.IngameRes = function(rom) {
 			loseA: new nsbca(r.KartModelSub.getFile(base+"_lose.nsbca")),
 			spinA: new nsbca(r.KartModelSub.getFile(base+"_spin.nsbca")),
 			winA: new nsbca(r.KartModelSub.getFile(base+"_win.nsbca")),
+			sndOff: toSoundOff[ind]*14,
 		}
 		characters[ind] = obj;
 		return characters[ind];

@@ -42,7 +42,14 @@ window.cameraIngame = function(kart) {
 		camNormal[2] += (kart.kartNormal[2]-camNormal[2])*0.075;
 		vec3.normalize(camNormal, camNormal);
 
-		camAngle += dirDiff(kart.physicalDir+kart.driftOff/2, camAngle)*0.075;
+		if (kart.physBasis != null) {
+			var kartA = kart.physicalDir+kart.driftOff/2;
+			var forward = [Math.sin(kartA), 0, -Math.cos(kartA)];
+			vec3.transformMat4(forward, forward, kart.physBasis.mat);
+			camAngle += dirDiff(Math.atan2(forward[0], -forward[2]), camAngle)*0.075;
+		} else {
+			camAngle += dirDiff(kart.physicalDir+kart.driftOff/2, camAngle)*0.075;
+		}
 		camAngle = fixDir(camAngle);
 
 		boostOff += (((kart.boostNorm+kart.boostMT > 0)?5:0) - boostOff)*0.075
@@ -52,14 +59,23 @@ window.cameraIngame = function(kart) {
 		var dist = 192;
 		this.targetShadowPos = vec3.add([], kart.pos, [Math.sin(kart.angle)*dist, 0, -Math.cos(kart.angle)*dist])
 
-		thisObj.view = {p:p, mv:mat};
+		thisObj.view = {p:p, mv:mat, pos: vec3.scale([], vec3.transformMat4([], [0,0,0], mat4.invert([], mat)), 1024)};
 
 		return thisObj.view;
 	}
 
 	function buildBasis() {
 		//order y, x, z
-		var basis = gramShmidt(camNormal, [Math.cos(camAngle), 0, Math.sin(camAngle)], [Math.sin(camAngle), 0, -Math.cos(camAngle)]);
+		var kart = thisObj.kart;
+		var forward = [Math.sin(camAngle), 0, -Math.cos(camAngle)];
+		var side = [Math.cos(camAngle), 0, Math.sin(camAngle)];
+		/*
+		if (kart.physBasis != null) {
+			vec3.transformMat4(forward, forward, kart.physBasis.mat);
+			vec3.transformMat4(side, side, kart.physBasis.mat);
+		}
+		*/
+		var basis = gramShmidt(camNormal, side, forward);
 		var temp = basis[0];
 		basis[0] = basis[1];
 		basis[1] = temp; //todo: cleanup

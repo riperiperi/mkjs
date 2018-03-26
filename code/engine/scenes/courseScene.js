@@ -165,6 +165,11 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 		vec3.scale(targ, targ, 1/1024);
 		mat4.mul(scn.shadMat, mat4.ortho(mat4.create(), targ[0]-shadres, targ[0]+shadres, targ[1]-shadres, targ[1]+shadres, -targ[2]-2.5, -targ[2]+2.5), scn.lightMat);
 
+		var places = [];
+		for (var i=0; i<scn.karts.length; i++) { places.push(scn.karts[i]); }
+		places.sort(function(a, b) {return b.getPosition() - a.getPosition()});
+		for (var i=0; i<places.length; i++) { places[i].placement = i+1; };
+
 		for (var i=0; i<scn.karts.length; i++) {
 			var ent = scn.karts[i];
 			if (ent.active) ent.update(scn);
@@ -291,9 +296,9 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 	// the thresholds for different win sounds and music
 	// thresh, goalsound, goalmusic, goalpostmusic
 	var finishPercents = [
-		[0, 66, 46, 58],
-		[0.5, 66, 47, 56],
-		[1.1, 67, 48, 57]
+		[0, 66, 46, 58, 9],
+		[0.5, 66, 47, 56, 10],
+		[1.1, 67, 48, 57, 11]
 	]
 
 	function lapAdvance(kart) {
@@ -309,20 +314,21 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 			else if (kart.lapNumber == 4) {
 				var finishTuple = [];
 				for (var i=0; i<finishPercents.length; i++) {
-					if (finishPercents[i][0] > winPercent) continue;
 					finishTuple = finishPercents[i];
+					if (finishPercents[i][0] >= winPercent) break;
 				}
 
 				kart.controller = new controlRaceCPU(scn.nkm, {});
 				kart.controller.setKart(kart);
 
-				kart.anim.setAnim(winPercent>0.5?kart.charRes.LoseA:kart.charRes.winA);
+				kart.anim.setAnim(winPercent>0.5?kart.charRes.loseA:kart.charRes.winA);
 				kart.animMode = "raceEnd";
 
 				scn.camera = (new cameraSpectator(kart, scn));
 				nitroAudio.playSound(finishTuple[1], {volume:2}, 0);
 				nitroAudio.playSound(finishTuple[2], {volume:2}, null);
 				nitroAudio.instaKill(scn.musicPlayer);
+				kart.playCharacterSound(finishTuple[4], 2);
 				musicRestartTimer = 0;
 				musicRestart = 7.5*60;
 				musicRestartType = 1;

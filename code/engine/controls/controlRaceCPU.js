@@ -19,6 +19,7 @@ window.controlRaceCPU = function(nkm) {
 	}
 
 	this.fetchInput = fetchInput;
+	this.setRouteID = setRouteID;
 
 	var battleMode = (nkm.sections["EPAT"] == null);
 
@@ -53,11 +54,30 @@ window.controlRaceCPU = function(nkm) {
 
 		var dist = vec3.dot(destNorm, kart.pos) + destConst;
 		if (dist < ePoi.pointSize) advancePoint();
+		if (ePath.loop) debugger;
 
 		destPoint = vec3.add([], ePoi.pos, vec3.scale([], vec3.lerp([], posOffset, destOff, offTrans), ePoi.pointSize));
 		var dirToPt = Math.atan2(destPoint[0]-kart.pos[0], kart.pos[2]-destPoint[2]);
 
-		var diff = dirDiff(dirToPt, kart.physicalDir);
+		var physDir = kart.physicalDir;
+		if (kart.physBasis) {
+			if (kart.physBasis.loop) { 
+				return {
+					accel: true, //x
+					decel: false, //z
+					drift: false, //s
+					item: false, //a
+
+					//-1 to 1, intensity.
+					turn: 0,
+					airTurn: 0 //air excitebike turn, doesn't really have much function
+				};
+			}
+			var forward = [Math.sin(physDir), 0, -Math.cos(physDir)];
+			vec3.transformMat4(forward, forward, kart.physBasis.mat);
+			var physDir = Math.atan2(forward[0], -forward[2]);
+		}
+		var diff = dirDiff(dirToPt, physDir);
 		var turn = Math.min(Math.max(-1, (diff*3)), 1);
 
 		offTrans += 1/240;
@@ -94,6 +114,11 @@ window.controlRaceCPU = function(nkm) {
 
 	}
 
+	function setRouteID(routeID) {
+		ePoiInd = routeID-1
+		advancePoint();
+	}
+
 	function advancePoint() {
 		if (++ePoiInd < ePath.startInd+ePath.pathLen) {
 			//next within this path
@@ -102,10 +127,14 @@ window.controlRaceCPU = function(nkm) {
 			//advance to one of next possible paths
 			
 			if (battleMode) {
-				var pathInd = ((Math.random()>0.5 && ePath.source.length>0)?ePath.source:ePath.dest)[Math.floor(Math.random()*ePath.dest.length)];
+				var loc = (Math.random()>0.5 && ePath.source.length>0)?ePath.source:ePath.dest;
+				var pathInd = loc[Math.floor(Math.random()*loc.length)];
 				ePoiInd = pathInd;
-				ePoi = points[ePoiInd];
-				recomputePath();
+				var pt = points[ePoiInd];
+				if (pt != null) {
+					ePoi = pt;
+					recomputePath();
+				}
 			} else {
 				var pathInd = ePath.dest[Math.floor(Math.random()*ePath.dest.length)];
 				ePath = paths[pathInd];

@@ -55,6 +55,7 @@ window.cameraSpectator = function(kart) {
 		if (zoomLevel > curCam.zoomEnd) zoomLevel = curCam.zoomEnd;
 		
 		thisObj.view = camFunc[curCam.camType](scene, curCam);
+		thisObj.view.pos = vec3.scale([], vec3.transformMat4([], [0,0,0], mat4.invert([], thisObj.view.mv)), 1024)
 		return thisObj.view;
 	}
 

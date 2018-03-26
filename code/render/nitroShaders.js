@@ -16,9 +16,39 @@ window.nitroShaders = new (function() {
 	\n\
 	uniform sampler2D uSampler;\n\
 	\n\
+	float indexValue() {\n\
+	    int x = int(mod(gl_FragCoord.x, 4.0));\n\
+	    int y = int(mod(gl_FragCoord.y, 4.0));\n\
+	    int i = (x + y * 4);\n\
+	    if (i == 0) return 0.0;\n\
+	    else if (i == 1) return 8.0;\n\
+	    else if (i == 2) return 2.0;\n\
+	    else if (i == 3) return 10.0;\n\
+	    else if (i == 4) return 12.0;\n\
+	    else if (i == 5) return 4.0;\n\
+	    else if (i == 6) return 14.0;\n\
+	    else if (i == 7) return 6.0;\n\
+	    else if (i == 8) return 3.0;\n\
+	    else if (i == 9) return 11.0;\n\
+	    else if (i == 10) return 1.0;\n\
+	    else if (i == 11) return 9.0;\n\
+	    else if (i == 12) return 15.0;\n\
+	    else if (i == 13) return 7.0;\n\
+	    else if (i == 14) return 13.0;\n\
+	    else if (i == 15) return 5.0;\n\
+	}\n\
+	\n\
+	float dither(float color) {\n\
+	    float closestColor = (color < 0.5) ? 0.0 : 1.0;\n\
+	    float secondClosestColor = 1.0 - closestColor;\n\
+	    float d = indexValue();\n\
+	    float distance = abs(closestColor - color);\n\
+	    return (distance < d) ? closestColor : secondClosestColor;\n\
+	}\n\
+	\n\
 	void main(void) {\n\
 		gl_FragColor = texture2D(uSampler, vTextureCoord)*color;\n\
-		if (gl_FragColor.a == 0.0) discard;\n\
+		if (gl_FragColor.a < 1.0 && (gl_FragColor.a == 0.0 || dither(gl_FragColor.a) == 0.0)) discard;\n\
 	}"
 
 	this.defaultVert = "attribute vec3 aVertexPosition;\n\
@@ -62,20 +92,20 @@ window.nitroShaders = new (function() {
 	\n\
 	uniform sampler2D uSampler;\n\
 	\n\
-	float shadowCompare(sampler2D map, vec2 pos, float compare) {\n\
+	float shadowCompare(sampler2D map, vec2 pos, float compare, float so) {\n\
 		float depth = texture2D(map, pos).r;\n\
-		return step(compare, depth);\n\
+		return smoothstep(compare-so, compare, depth);\n\
 	}\n\
 	\n\
-	float shadowLerp(sampler2D depths, vec2 size, vec2 uv, float compare){\n\
+	float shadowLerp(sampler2D depths, vec2 size, vec2 uv, float compare, float so){\n\
 		vec2 texelSize = vec2(1.0)/size;\n\
 		vec2 f = fract(uv*size+0.5);\n\
 		vec2 centroidUV = floor(uv*size+0.5)/size;\n\
 		\n\
-		float lb = shadowCompare(depths, centroidUV+texelSize*vec2(0.0, 0.0), compare);\n\
-		float lt = shadowCompare(depths, centroidUV+texelSize*vec2(0.0, 1.0), compare);\n\
-		float rb = shadowCompare(depths, centroidUV+texelSize*vec2(1.0, 0.0), compare);\n\
-		float rt = shadowCompare(depths, centroidUV+texelSize*vec2(1.0, 1.0), compare);\n\
+		float lb = shadowCompare(depths, centroidUV+texelSize*vec2(0.0, 0.0), compare, so);\n\
+		float lt = shadowCompare(depths, centroidUV+texelSize*vec2(0.0, 1.0), compare, so);\n\
+		float rb = shadowCompare(depths, centroidUV+texelSize*vec2(1.0, 0.0), compare, so);\n\
+		float rt = shadowCompare(depths, centroidUV+texelSize*vec2(1.0, 1.0), compare, so);\n\
 		float a = mix(lb, lt, f.y);\n\
 		float b = mix(rb, rt, f.y);\n\
 		float c = mix(a, b, f.x);\n\
@@ -89,14 +119,14 @@ window.nitroShaders = new (function() {
 		float dist = max(ldNorm.x, ldNorm.y);\n\
 		\n\
 		if (dist > 0.5) {\n\
-			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff));\n\
+			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff, farShadOff*2.0));\n\
 		} else if (dist > 0.4) {\n\
-			float lerp1 = shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff);\n\
-			float lerp2 = shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff);\n\
+			float lerp1 = shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff, farShadOff*2.0);\n\
+			float lerp2 = shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff, shadOff*4.0);\n\
 			\n\
 			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), mix(lerp2, lerp1, (dist-0.4)*10.0));\n\
 		} else {\n\
-			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff));\n\
+			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff, shadOff*4.0));\n\
 		}\n\
 		\n\
 		if (gl_FragColor.a == 0.0) discard;\n\
@@ -118,6 +148,7 @@ window.nitroShaders = new (function() {
 	\n\
 	uniform mat4 shadowMat;\n\
 	uniform mat4 farShadowMat;\n\
+	uniform float lightIntensity; \n\
 	\n\
 	varying vec2 vTextureCoord;\n\
 	varying vec4 color;\n\
@@ -133,7 +164,7 @@ window.nitroShaders = new (function() {
 		lightDist = (shadowMat*pos + vec4(1, 1, 1, 0)) / 2.0;\n\
 		fLightDist = (farShadowMat*pos + vec4(1, 1, 1, 0)) / 2.0;\n\
 		vec3 adjNorm = normalize(vec3(uMVMatrix * matStack[int(matrixID)] * vec4(aNormal, 0.0)));\n\
-		float diffuse = 0.7-dot(adjNorm, vec3(0.0, -1.0, 0.0))*0.3;\n\
+		float diffuse = (1.0-lightIntensity)-dot(adjNorm, vec3(0.0, -1.0, 0.0))*lightIntensity;\n\
 		\n\
 		color = aColor*colMult;\n\
 		color = vec4(color.x*diffuse, color.y*diffuse, color.z*diffuse, color.w);\n\
@@ -270,6 +301,7 @@ window.nitroShaders = new (function() {
 	var shadUnif = [
 		["shadowMatUniform", "shadowMat"],
 		["farShadowMatUniform", "farShadowMat"],
+		["lightIntensityUniform", "lightIntensity"],
 
 		["shadOffUniform", "shadOff"],
 		["farShadOffUniform", "farShadOff"],

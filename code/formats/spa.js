@@ -9,6 +9,7 @@
 window.spa = function(input) {
     var t = this;
     this.load = load;
+    this.getTexture = getTexture;
 
     var colourBuffer;
 
@@ -36,40 +37,106 @@ window.spa = function(input) {
 
         offset += 24;
         if (version == "12_1") {
-            this.particles = [];
-            for (let i=0; i<particleCount; i++) {
-                this.particles[i] = readParticle(view, offset);
-                offset = this.particles[i].nextOff;
+            t.particles = [];
+            for (var i=0; i<particleCount; i++) {
+                t.particles[i] = readParticle(view, offset);
+                t.particles[i].parent = t;
+                offset = t.particles[i].nextOff;
             }
         }
 
         offset = firstTexOffset;
-        this.particleTextures = [];
-        for (let i=0; i<particleTexCount; i++) {
-            this.particleTextures[i] = readParticleTexture(view, offset);
-            offset = this.particleTextures[i].nextOff;
+        t.particleTextures = [];
+        for (var i=0; i<particleTexCount; i++) {
+            t.particleTextures[i] = readParticleTexture(view, offset);
+            offset = t.particleTextures[i].nextOff;
         }
 
+        //window.debugParticle = true;
         if (window.debugParticle) {
-            for (let i=0; i<particleCount; i++) {
+            for (var i=0; i<particleCount; i++) {
                 var text = document.createElement("textarea");
-                var p = this.particles[i];
+                var p = t.particles[i];
+                p.parent = null;
                 text.value = JSON.stringify(p, true, 4);
+                p.parent = t;
                 text.style.width = 500;
                 text.style.height = 200;
                 
 
-                var obj = this.particleTextures[p.textureId];
-                if (p.texAnim) obj = this.particleTextures[p.texAnim.textures[0]];
+                var obj = t.particleTextures[p.textureId];
+                if (p.texAnim) obj = t.particleTextures[p.texAnim.textures[0]];
                 if (obj == null) {
                     continue;
                 }
                 var test = readTexWithPal(obj.info, obj);
+                document.body.appendChild(document.createElement("br"));
+                document.body.appendChild(document.createTextNode(i+":"));
                 document.body.appendChild(test);
                 document.body.appendChild(text);
-                document.body.appendChild(document.createElement("br"));
+
             }
         }
+    }
+
+    function getTexture(id, gl) {
+        var t = this;
+        var obj = t.particleTextures[id];
+        if (obj == null) {
+            return null;
+        }
+        if (obj.glTex == null) {
+            var canvas = readTexWithPal(obj.info, obj);
+            var m = obj.info;
+            if (m.flipX || m.flipY) {
+                var fC = document.createElement("canvas");
+                var ctx = fC.getContext("2d");
+                fC.width = (m.flipX)?canvas.width*2:canvas.width;
+                fC.height = (m.flipY)?canvas.height*2:canvas.height;
+                ctx.drawImage(canvas, 0, 0);
+                ctx.save();
+                if (m.flipX) {
+                    ctx.translate(2*canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(canvas, 0, 0);
+                    ctx.restore();
+                    ctx.save();
+                }
+                if (m.flipY) {
+                    ctx.translate(0, 2*canvas.height);
+                    ctx.scale(1, -1);
+                    ctx.drawImage(fC, 0, 0);
+                    ctx.restore();
+                }
+                var t = loadTex(fC, gl, !m.repeatX, !m.repeatY);
+                t.realWidth = canvas.width;
+                t.realHeight = canvas.height;
+                obj.glTex = t;
+            } else {
+                var t = loadTex(canvas, gl, !m.repeatX, !m.repeatY);
+                t.realWidth = canvas.width;
+                t.realHeight = canvas.height;
+                obj.glTex = t;
+            }
+        }
+        return obj.glTex;
+    }
+
+    function loadTex(img, gl, clampx, clampy) { //general purpose function for loading an image into a texture.
+        var texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        if (clampx) gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        if (clampy) gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        texture.width = img.width;
+        texture.height = img.height;
+
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        return texture;
     }
 
     function readParticle(view, off) {
@@ -106,6 +173,7 @@ window.spa = function(input) {
             Bit29: 0x20000000
         }
 
+        obj.ParticleFlags = ParticleFlags;
         obj.flag = view.getUint32(off, true);
         obj.position = [view.getInt32(off+0x4, true)/4096, view.getInt32(off+0x8, true)/4096, view.getInt32(off+0xC, true)/4096];
         //this is just hilarious at this point
@@ -118,8 +186,8 @@ window.spa = function(input) {
         //not sure what this vector is for. grass it's (0, 1, 0), smoke it's (-0.706787109375, 0, -0.707275390625) billboard alignment vector? (it's a bit crazy for powerslide)
         obj.vector = [view.getInt16(off+0x1C, true)/4096, view.getInt16(off+0x1E, true)/4096, view.getInt16(off+0x20, true)/4096];
         obj.color = view.getUint16(off+0x22, true); //15 bit, usually 32767 for white.
-        obj.randomxz = view.getUint32(off+0x24, true); //random xz velocity intensity
-        obj.velocity = view.getUint32(off+0x28, true); //initial velocity related
+        obj.randomxz = view.getUint32(off+0x24, true)/4096; //random xz velocity intensity
+        obj.velocity = view.getUint32(off+0x28, true)/4096; //initial velocity related (along predefined vector)
         obj.size = view.getUint32(off+0x2C, true)/4096; //size
         obj.aspect = view.getUint16(off+0x30, true) / 4096; //aspect
 
@@ -130,8 +198,8 @@ window.spa = function(input) {
         obj.rotVelFrom = view.getInt16(off+0x34, true);
         obj.rotVelTo = view.getInt16(off+0x36, true);
 
-        obj.unknown13 = view.getUint16(off+0x38, true); //??? (0)
-        obj.unknown14 = view.getUint16(off+0x3A, true); //??? (4B)
+        obj.scX = view.getInt16(off+0x38, true)/0x8000; //??? (0) //scale center offset?
+        obj.scY = view.getInt16(off+0x3A, true)/0x8000; //??? (4B) //scale center offset?
         obj.emitterLifetime = view.getUint16(off+0x3C, true); //stop emitting particles after this many frames
         obj.duration = view.getUint16(off+0x3E, true); 
 
@@ -146,8 +214,8 @@ window.spa = function(input) {
         obj.textureId = view.getUint8(off+0x47, true);
         obj.unknown21 = view.getUint32(off+0x48, true); //negative number makes grass disappear (1 for grass, smoke)
         obj.unknown22 = view.getUint32(off+0x4C, true); //some numbers make grass disappear (0x458d00 for grass, 0x74725f60 for smoke)
-        obj.xScaleDelta = view.getUint16(off+0x50, true); //x scale delta for some reason. usually 0
-        obj.yScaleDelta = view.getUint16(off+0x52, true); //y scale delta for some reason. usually 0
+        obj.xScaleDelta = view.getInt16(off+0x50, true)/4096; //x scale delta for some reason. usually 0
+        obj.yScaleDelta = view.getInt16(off+0x52, true)/4096; //y scale delta for some reason. usually 0
         obj.unknown25 = view.getUint32(off+0x54, true); //FFFFFFFF makes run at half framerate. idk? usually 0
         off += 0x58;
 
@@ -165,7 +233,8 @@ window.spa = function(input) {
                 unkBase: view.getUint16(off, true)/4096,
                 scaleFrom: view.getUint16(off+2, true)/4096,
                 scaleTo: view.getUint16(off+4, true)/4096,
-                param: view.getUint16(off+6, true),
+                fromZeroTime: view.getUint8(off+6, true)/0xFF, //time to dedicate to an animation from zero size
+                holdTime: view.getUint8(off+7, true)/0xFF, //time to dedicate to holding state at the end.
                 flagParam: view.getUint16(off+8, true),
                 unk4b: view.getUint16(off+10, true),
             };
@@ -173,7 +242,7 @@ window.spa = function(input) {
         }
         if ((obj.flag & ParticleFlags.ColorAnimation) != 0)
         {
-            obj.ColorAnimation = {
+            obj.colorAnim = {
                 colorFrom: view.getUint16(off, true), //color from 
                 colorTo: view.getUint16(off+2, true), //color to (seems to be same as base color)
                 framePct: view.getUint16(off+4, true), //frame pct to become color to (FFFF means always from, 8000 is about the middle)
@@ -203,7 +272,7 @@ window.spa = function(input) {
         if ((obj.flag & ParticleFlags.TextureAnimation) != 0)
         {
             var textures = [];
-            for (let i=0; i<8; i++) textures[i] = view.getUint8(off+i);
+            for (var i=0; i<8; i++) textures[i] = view.getUint8(off+i);
             obj.texAnim = {
                 textures: textures,
                 frames: view.getUint8(off+8),
@@ -215,7 +284,7 @@ window.spa = function(input) {
         if ((obj.flag & ParticleFlags.Bit16) != 0)
         {
             obj.Bit16 = [];
-            for (let i=0; i<20; i++) obj.Bit16[i] = view.getUint8(off+i);
+            for (var i=0; i<20; i++) obj.Bit16[i] = view.getUint8(off+i);
             off += 20;
         }
         if ((obj.flag & ParticleFlags.Gravity) != 0)
@@ -239,31 +308,31 @@ window.spa = function(input) {
         {
             //seems to be 4 int 16s typically in some kind of pattern.
             obj.Bit25 = [];
-            for (let i=0; i<8; i++) obj.Bit25[i] = view.getUint8(off+i);
+            for (var i=0; i<8; i++) obj.Bit25[i] = view.getUint8(off+i);
             off += 8;
         }
         if ((obj.flag & ParticleFlags.Bit26) != 0)
         {
             obj.Bit26 = [];
-            for (let i=0; i<16; i++) obj.Bit26[i] = view.getUint8(off+i);
+            for (var i=0; i<16; i++) obj.Bit26[i] = view.getUint8(off+i);
             off += 16;
         }
         if ((obj.flag & ParticleFlags.Bit27) != 0)
         {
             obj.Bit27 = [];
-            for (let i=0; i<4; i++) obj.Bit27[i] = view.getUint8(off+i);
+            for (var i=0; i<4; i++) obj.Bit27[i] = view.getUint8(off+i);
             off += 4;
         }
         if ((obj.flag & ParticleFlags.Bit28) != 0)
         {
             obj.Bit28 = [];
-            for (let i=0; i<8; i++) obj.Bit28[i] = view.getUint8(off+i);
+            for (var i=0; i<8; i++) obj.Bit28[i] = view.getUint8(off+i);
             off += 8;
         }
         if ((obj.flag & ParticleFlags.Bit29) != 0)
         {
             obj.Bit29 = [];
-            for (let i=0; i<16; i++) obj.Bit29[i] = view.getUint8(off+i);
+            for (var i=0; i<16; i++) obj.Bit29[i] = view.getUint8(off+i);
             off += 16;
         }
 
@@ -278,7 +347,7 @@ window.spa = function(input) {
 
         var flags = view.getUint16(off+4, true);
         obj.info = {
-            pal0trans: (flags>>3)&1, //weirdly different format
+            pal0trans: true,//z(flags>>3)&1, //weirdly different format
             format: ((flags)&7),
             height: 8 << ((flags>>8)&0xF),
             width: 8 << ((flags>>4)&0xF),
