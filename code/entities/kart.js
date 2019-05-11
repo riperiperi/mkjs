@@ -427,7 +427,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				var current = checkpoints[k.checkPointNumber];
 				var respawn;
 				if (current == null)
-					respawn = (Math.random() * respawns.length) | 0;
+					respawn = respawns[(Math.random() * respawns.length) | 0]; //todo: deterministic
 				else
 					respawn = respawns[current.respawn];
 				k.physicalDir = (180-respawn.angle[1])*(Math.PI/180);
