@@ -425,7 +425,11 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			if (k.OOB > 0) {
 				playCharacterSound(0);
 				var current = checkpoints[k.checkPointNumber];
-				var respawn = respawns[current.respawn];
+				var respawn;
+				if (current == null)
+					respawn = (Math.random() * respawns.length) | 0;
+				else
+					respawn = respawns[current.respawn];
 				k.physicalDir = (180-respawn.angle[1])*(Math.PI/180);
 				k.angle = k.physicalDir;
 				k.speed = 0;
@@ -822,7 +826,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	}
 
 	function getPosition() {
-		if (futureChecks.length == 0) return 0;
+		if (checkpoints.length == 0 || futureChecks.length == 0) return 0;
 		var check = checkpoints[futureChecks[0]];
 		var dist = vec2.sub([], [check.x1, check.z1], [k.pos[0], k.pos[2]]);
 		var dot = vec2.dot(dist, [check.sinus, check.cosinus]);
