@@ -1,4 +1,5 @@
 *.nds
 *.exe
+*.sdat
 mongoose.conf
 Code/Engine/col.lua

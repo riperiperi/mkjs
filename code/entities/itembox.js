@@ -48,6 +48,7 @@ window.ItemBox = function(obji, scene) {
 						scene.particles.push(new NitroEmitter(scene, ok, 47));
 						t.mode = 1;
 						t.time = 0;
+						ok.items.getItem(null); //todo: specific item from some
 						break;
 					}
 				}

@@ -36,6 +36,9 @@ window.nsbtp = function(input) {
 	}
 	this.load = load;
 
+	var texTotal;
+	var palTotal;
+
 
 	function load(input) {
 		var view = new DataView(input);
@@ -56,7 +59,6 @@ window.nsbtp = function(input) {
 		if (stamp != "PAT0") throw "NSBTP invalid. Expected PAT0, found "+stamp;
 
 		animData = nitro.read3dInfo(view, mainOff+8, animInfoHandler);
-		debugger;
 		mainObj.animData = animData;
 	}
 
@@ -92,15 +94,15 @@ window.nsbtp = function(input) {
 		//8 bytes here? looks like texinfo
 
 		var duration = view.getUint16(offset, true);
-		var tframes = view.getUint8(offset+2);
-		var pframes = view.getUint8(offset+3);
+		texTotal = view.getUint8(offset+2);
+		palTotal = view.getUint8(offset+3);
 		var unknown = view.getUint16(offset+4, true);
 		var unknown2 = view.getUint16(offset+6, true);
 
 		//...then another nitro
 		var data = nitro.read3dInfo(view, offset+8, matInfoHandler);
 
-		return {data: data, nextoff: data.nextoff, tframes:tframes, pframes:pframes, unknown:unknown, unknown2:unknown2, duration:duration};
+		return {data: data, nextoff: data.nextoff, texTotal:texTotal, palTotal:palTotal, unknown:unknown, unknown2:unknown2, duration:duration};
 	}
 
 	function matInfoHandler(view, offset, base) {
@@ -141,13 +143,24 @@ window.nsbtp = function(input) {
 			offset += 4;
 		}
 
+        obj.texNames = [];
 		//read 16char tex names
-		for (var i=0; i<frames; i++) {
-
+		for (var i=0; i<texTotal; i++) {
+			var name = "";
+			for (var j=0; j<16; j++) {
+				name += readChar(view, offset++)
+			}
+			obj.texNames[i] = name;
 		}
+
+		obj.palNames = [];
 		//read 16char pal names
-		for (var i=0; i<frames; i++) {
-			
+		for (var i=0; i<palTotal; i++) {
+			var name = "";
+			for (var j=0; j<16; j++) {
+				name += readChar(view, offset++)
+			}
+			obj.palNames[i] = name;
 		}
 		return obj;
 	}

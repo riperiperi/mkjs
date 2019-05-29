@@ -36,11 +36,23 @@ window.Race3DUI = function(scene, type, animStart) {
 		],
 		"start": [ //offset 86 up
 			-128/1024, 128/1024, -(192+66)/1024, -66/1024
-		]
+		],
+		"goal": [ //why are these all so different?
+			-128/1024, 128/1024, -(512 + 64)/1024, -(512 - 128)/1024
+		],
+
+		//animations seem completely broken for these two (quickly files off screen after start)
+		//right now the vertical range of the viewport is large to try figure out where the hell it's going?
+		"win": [
+			-128/1024, 128/1024, -(1024)/1024, 1024/1024
+		],
+		"lose": [
+			-128/1024, 128/1024, -(1024)/1024, 1024/1024
+		],
 	}
 
 	var param = params[type];
-	if (param == null) param = params["count"]
+	if (param == null) param = params["count"];
 
 	mat4.ortho(proj, param[0], param[1], param[2], param[3], -0.001, 10);
 	buildOrtho(nitroRender.getViewWidth(), nitroRender.getViewHeight());
@@ -54,10 +66,13 @@ window.Race3DUI = function(scene, type, animStart) {
 		bmd = new nsbmd(bmd);
 
 		var bca = new nsbca(scene.gameRes.Race.getFile(type+".nsbca"));
+		var btp = scene.gameRes.Race.getFile(type+".nsbtp");
+		if (btp != null) btp = new nsbtp(btp);
 		anim = new nitroAnimator(bmd, bca);
 		length = anim.getLength(0);
 		if (type == "count") length *= 3;
 		model = new nitroModel(bmd);
+		model.loadTexPAnim(btp)
 	}
 
 	function buildOrtho(width, height) {
@@ -72,11 +87,14 @@ window.Race3DUI = function(scene, type, animStart) {
 		var width = nitroRender.getViewWidth();
 		if (width != lastWidth) buildOrtho(width, nitroRender.getViewHeight());
 		mat4.translate(mat, view, t.pos);
+		nitroRender.pauseShadowMode();
 		model.draw(mat, proj, animMat);
+		nitroRender.unpauseShadowMode();
 	}
 
 	function update() {
 		if (anim != null) {
+			model.setFrame(animFrame);
 			animMat = anim.setFrame(0, 0, Math.max(0, animFrame++));
 		}
 		if (animFrame > length) {

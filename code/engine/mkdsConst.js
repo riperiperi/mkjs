@@ -7,6 +7,10 @@
 
 window.MKDSCONST = new (function() {
 
+	this.DAMAGE_SPIN = 0;
+	this.DAMAGE_FLIP = 0;
+	this.DAMAGE_EXPLODE = 0;
+
 	this.COURSEDIR = "/data/Course/";
 
 	this.COURSES = [ //in order of course id, nitro through retro

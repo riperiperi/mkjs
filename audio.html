@@ -13,13 +13,13 @@
 		fileQuota = 1;
 		filesLoaded = 0;
 		window.onload = function(argument) {
-			loadFile("sound_data.sdat");
+			loadFile("SD_BBP2p.sdat");
 		}
 
 		var i=0;
 		var last = null;
 		function init() {
-			nitroAudio.init(new sdat(files["sound_data.sdat"])); //89
+			nitroAudio.init(new sdat(files["SD_BBP2p.sdat"])); //89
 			//you need to extract this one yourself!
 
 			play.addEventListener('click', function() {
@@ -29,7 +29,7 @@
 			})
 			/*
 			var ctx = new AudioContext();
-			test = new sdat(files["sound_data.sdat"]);
+			test = new sdat(files["SD_BBP2p.sdat"]);
 			testAud = new SSEQPlayer(test.sections["$INFO"][0][5], test, ctx);
 
 			var elem = document.getElementById('play'),

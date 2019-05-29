@@ -61,6 +61,7 @@ window.IngameRes = function(rom) {
 		}
 		t.blueShell = new nitroModel(new nsbmd(r.MainRace.getFile("/Item/koura_w.nsbmd")));
 		t.splat = new nitroModel(new nsbmd(r.MainRace.getFile("/Item/geso_sumi.nsbmd")));
+		t.fakeBox = new nitroModel(new nsbmd(r.MainRace.getFile("/MapObj/box.nsbmd")));
 		r.items = t;
 	}
 

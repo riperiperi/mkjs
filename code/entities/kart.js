@@ -27,6 +27,9 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	this.active = true;
 	this.preboost = true;
 
+	//supplimentary controllers
+	this.items = new KartItems(this, scene);
+
 	this.soundProps = {};
 	this.pos = pos;
 	this.angle = angle;
@@ -311,6 +314,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		kartAnim = (kartAnim+1)%8;
 		var input = k.controller.fetchInput();
 		k.lastInput = input;
+		k.items.update(input);
 
 		if (input.turn > 0.3) {
 			if (k.driveAnimF < 28) k.driveAnimF++;
@@ -386,7 +390,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		} else if (k.cannon != null) { //when cannon is active, we fly forward at max move speed until we get to the cannon point.
 			var c = scene.nkm.sections["KTPC"].entries[k.cannon];
 
-			if (c.id2 != 0) {
+			if (c.id1 != -1 && c.id2 != -1) {
 				var c2 = scene.nkm.sections["KTPC"].entries[c.id2];
 				c = c2;
 
@@ -401,10 +405,18 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				k.angle = k.physicalDir;
 				k.cannon = null;
 			} else {
-
 				var mat = mat4.create();
 				mat4.rotateY(mat, mat, c.angle[1]*(Math.PI/180));
-				mat4.rotateX(mat, mat, c.angle[0]*(-Math.PI/180));
+				if (true) {
+					//vertical angle from position? airship fortress is impossible otherwise
+					//var c2 = scene.nkm.sections["KTPC"].entries[c.id2];
+					var diff = vec3.sub([], c.pos, k.pos);
+					var dAdj = Math.sqrt(diff[0]*diff[0] + diff[2]*diff[2]);
+					var dHyp = Math.sqrt(diff[0]*diff[0] + diff[1]*diff[1] + diff[2]*diff[2]);
+					mat4.rotateX(mat, mat, ((diff[1] > 0) ? -1 : 1) * Math.acos(dAdj/dHyp));
+				} else {
+					mat4.rotateX(mat, mat, c.angle[0]*(-Math.PI/180));
+				}
 
 				var forward = [0, 0, 1];
 				var up = [0, 1, 0];
@@ -415,10 +427,15 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				k.physicalDir = (180-c.angle[1])*(Math.PI/180);
 				k.angle = k.physicalDir;
 				k.kartTargetNormal = vec3.transformMat4(up, up, mat);
+				k.airTime = 0;
 
 				var planeConst = -vec3.dot(c.pos, forward);
 				var cannonDist = vec3.dot(k.pos, forward) + planeConst;
-				if (cannonDist > 0) k.cannon = null;
+				if (cannonDist > 0) {
+					k.cannon = null; //leaving cannon state
+					k.speed = params.topSpeed;
+					k.vel = vec3.scale([], vec3.transformMat4(forward, forward, mat), k.speed);
+				}
 			}
 		} else { //default kart mode
 
@@ -611,6 +628,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 						k.driftLanded = false;
 						k.driftMode = 0;
 						k.ylock = 0;
+						onGround = false;
 
 						var boing = nitroAudio.playSound(207, {transpose: -4}, 0, k);
 						boing.gainN.gain.value = 2;
@@ -655,11 +673,18 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 					vec3.add(k.vel, k.vel, k.kartColVel);
 				}
 			} else {
-				k.angle += dirDiff(k.physicalDir, k.angle)*effect.handling/2;
-				k.angle = fixDir(k.physicalDir);
+				k.angle += dirDiff(k.physicalDir, k.angle)*effect.handling;
+				k.angle += dirDiff(k.physicalDir, k.angle)*effect.handling; //applying this twice appears to be identical to the original
+				k.angle = fixDir(k.angle);
 
+                //reduce our forward speed by how much of our velocity is not going forwards
+                var factor = Math.sin(k.physicalDir)*Math.sin(k.angle) + Math.cos(k.physicalDir)*Math.cos(k.angle);
+                k.speed *= 1 - ((1-factor) * (1 - k.params.decel));
+                //var reducedSpeed = k.vel[0]*Math.sin(k.angle) + k.vel[2]*(-Math.cos(k.angle));
+                //reducedSpeed = ((reducedSpeed < 0) ? -1 : 1) * Math.sqrt(Math.abs(reducedSpeed));
 				k.vel[1] += k.gravity[1];
 				k.vel = [Math.sin(k.angle)*k.speed, k.vel[1], -Math.cos(k.angle)*k.speed]
+				//k.speed = reducedSpeed;
 
 				if (k.kartColTimer > 0) {
 					vec3.add(k.vel, k.vel, vec3.scale([], k.kartColVel, k.kartColTimer/10))
@@ -736,6 +761,24 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 		updateKartSound(newSoundMode, input);
 		positionChanged(lastPos, k.pos);
+	}
+
+	function triggerCannon(id) {
+		if (k.cannon != null) return;
+		k.cannon = id;
+		var c = scene.nkm.sections["KTPC"].entries[k.cannon];
+		if (c.id1 != -1 && c.id2 != -1) {
+			nitroAudio.playSound(345, {volume: 2.5}, 0, k);
+		} else {
+			nitroAudio.playSound(347, {volume: 2.5}, 0, k);
+			if (k.local) {
+				if (c.id2 == 0) {
+					nitroAudio.playSound(380, {volume: 2}, 0, null); //airship fortress
+				} else {
+					nitroAudio.playSound(456, {volume: 2}, 0, null); //waluigi
+				}
+			}
+		}
 	}
 
 	function playCharacterSound(sound, volume) {
@@ -856,7 +899,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			if (k != ok) {
 				var dist = vec3.dist(k.pos, ok.pos);
 				if (dist < 16) {
-
+					nitroAudio.playSound(208, { volume: 2 }, 0, k);
 					kartBounce(ok);
 					ok.kartBounce(k);
 				}
@@ -879,6 +922,8 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		if (vec3.length(k.vel) < vec3.length(ok.vel)) vec3.add(k.kartColVel, k.kartColVel, vec3.sub([], ok.vel, k.vel));
 
 		k.kartColVel[1] = 0;
+		//play this kart's horn
+		nitroAudio.playSound(192 + charRes.sndOff/14, { volume: 2 }, 0, k);
 	}
 
 	function fixDir(dir) {
@@ -896,7 +941,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 	function updateKartSound(mode, input) {
 		var turn = (onGround && !k.drifting)?(1-Math.abs(input.turn)/11):1;
-		var transpose = (mode == 0)?0:(22*turn*k.speed/params.topSpeed);
+		var transpose = (mode == 0)?0:(22*turn*Math.min(1.3, k.speed/params.topSpeed));
 
 		sounds.transpose += (transpose-sounds.transpose)/15;
 		if (mode != soundMode) {
@@ -965,6 +1010,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		k.physBasis = {
 			mat: m4,
 			inv: mat4.invert([], m4),
+			normal: normal,
 			time: 15,
 			loop: false
 		};
@@ -1099,7 +1145,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			stuckTo = dat.object;
 		} else if (colType == MKDS_COLTYPE.CANNON) {
 			//cannon!!
-			k.cannon = colBE;
+			triggerCannon(colBE);
 		} else {
 			adjustPos = false;
 			ignoreList.push(plane);

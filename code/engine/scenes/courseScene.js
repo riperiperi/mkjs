@@ -56,12 +56,17 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 
 	//load main course
 	var courseTx = new nsbtx(texNarc.getFile("/course_model.nsbtx"), false, true);
+
 	var taFile = mainNarc.getFile("/course_model.nsbta");
 	if (taFile != null) var courseTa = new nsbta(taFile); //can be null
+	var tpFile = mainNarc.getFile("/course_model.nsbtp");
+	if (tpFile != null) var courseTp = new nsbtp(tpFile); //can be null
+
 	var courseMdl = new nsbmd(mainNarc.getFile("/course_model.nsbmd"));
 
 	var course = new nitroModel(courseMdl, courseTx)
 	if (taFile != null) course.loadTexAnim(courseTa);
+	if (tpFile != null) course.loadTexPAnim(courseTp);
 
 	//load sky
 	var skyTx = new nsbtx(texNarc.getFile("/course_model_V.nsbtx"), false, true);
@@ -229,12 +234,25 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 		scn.paths = paths;
 	}
 
+	function getLightCenter() {
+		var average = vec3.create();
+		var objs = scn.nkm.sections["OBJI"].entries;
+		for (var i=0; i<objs.length; i++) {
+			vec3.add(average, average, objs[i].pos);
+		}
+		vec3.scale(average, average, (1/objs.length) /-1024);
+		return average;
+	}
+
 	function startCourse() {
 		scn.lightMat = mat4.create();
+		
 		mat4.rotateX(scn.lightMat, scn.lightMat, Math.PI*(61/180));
 		mat4.rotateY(scn.lightMat, scn.lightMat, Math.PI*(21/180));
+		scn.farShadMat = mat4.create();
+		mat4.translate(scn.farShadMat, scn.lightMat, getLightCenter());
 
-		mat4.mul(scn.farShadMat, mat4.ortho(mat4.create(), -5, 5, -5, 5, -5, 5), scn.lightMat);
+		mat4.mul(scn.farShadMat, mat4.ortho(mat4.create(), -5, 5, -5, 5, -5, 5), scn.farShadMat);
 
 		compilePaths();
 

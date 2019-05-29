@@ -275,6 +275,26 @@ window.nitroRender = new function() {
 		this.prepareShader();
 	}
 
+	var paused = false;
+
+	this.pauseShadowMode = function() {
+		this.nitroShader = shaders[0];
+		if (this.nitroShader == shaders[1]) paused = true;
+		gl.useProgram(this.nitroShader);
+
+		this.setColMult([1, 1, 1, 1]);
+		this.prepareShader();
+	}
+
+	this.unpauseShadowMode = function() {
+		if (!paused) return;
+		this.nitroShader = shaders[1];
+		gl.useProgram(this.nitroShader);
+
+		this.setColMult([1, 1, 1, 1]);
+		this.prepareShader();
+	}
+
 	this.setColMult = function(color) {
 		gl.useProgram(this.nitroShader);
 		gl.uniform4fv(this.nitroShader.colMultUniform, color);
@@ -360,6 +380,7 @@ function nitroModel(bmd, btx, remap) {
 	var texCanvas;
 	var tex;
 	var texAnim;
+	var texPAnim;
 	var texFrame;
 	var modelBuffers;
 	var collisionModel = [];
@@ -402,7 +423,7 @@ function nitroModel(bmd, btx, remap) {
 	}
 
 
-function loadWhiteTex(btx) { //examines the materials in the loaded model and generates textures for each.
+	function loadWhiteTex(btx) { //examines the materials in the loaded model and generates textures for each.
 		var gl = nitroRender.gl; //get gl object from nitro render singleton
 		loadedTex = btx;
 		texCanvas = [];
@@ -470,47 +491,54 @@ function loadWhiteTex(btx) { //examines the materials in the loaded model and ge
 				var cacheID = truetex+":"+truepal;
 				var cached = btx.cache[cacheID];
 
-				if (cached == null) {
-					var canvas = btx.readTexWithPal(truetex, truepal);
-					if (m.flipX || m.flipY) {
-						var fC = document.createElement("canvas");
-						var ctx = fC.getContext("2d");
-						fC.width = (m.flipX)?canvas.width*2:canvas.width;
-						fC.height = (m.flipY)?canvas.height*2:canvas.height;
-
-						ctx.drawImage(canvas, 0, 0);
-						ctx.save();
-						if (m.flipX) {
-							ctx.translate(2*canvas.width, 0);
-							ctx.scale(-1, 1);
-							ctx.drawImage(canvas, 0, 0);
-							ctx.restore();
-							ctx.save();
-						}
-						if (m.flipY) {
-							ctx.translate(0, 2*canvas.height);
-							ctx.scale(1, -1);
-							ctx.drawImage(fC, 0, 0);
-							ctx.restore();
-						}
-						texCanvas.push(fC);
-						var t = loadTex(fC, gl, !m.repeatX, !m.repeatY);
-						t.realWidth = canvas.width;
-						t.realHeight = canvas.height;
-						tex.push(t);
-						btx.cache[cacheID] = t;
-					} else {
-						texCanvas.push(canvas);
-						var t = loadTex(canvas, gl, !m.repeatX, !m.repeatY);
-						t.realWidth = canvas.width;
-						t.realHeight = canvas.height;
-						tex.push(t);
-						btx.cache[cacheID] = t;
-					}
-				} else {
-					tex.push(cached);
-				}
+                tex.push(cacheTex(btx, truetex, truepal, m));
 			}
+		}
+	}
+
+	function cacheTex(btx, truetex, truepal, m) {
+		var cacheID = truetex+":"+truepal;
+		var cached = btx.cache[cacheID];
+
+		if (cached == null) {
+			var canvas = btx.readTexWithPal(truetex, truepal);
+			if (m.flipX || m.flipY) {
+				var fC = document.createElement("canvas");
+				var ctx = fC.getContext("2d");
+				fC.width = (m.flipX)?canvas.width*2:canvas.width;
+				fC.height = (m.flipY)?canvas.height*2:canvas.height;
+
+				ctx.drawImage(canvas, 0, 0);
+				ctx.save();
+				if (m.flipX) {
+					ctx.translate(2*canvas.width, 0);
+					ctx.scale(-1, 1);
+					ctx.drawImage(canvas, 0, 0);
+					ctx.restore();
+					ctx.save();
+				}
+				if (m.flipY) {
+					ctx.translate(0, 2*canvas.height);
+					ctx.scale(1, -1);
+					ctx.drawImage(fC, 0, 0);
+					ctx.restore();
+				}
+				texCanvas.push(fC);
+				var t = loadTex(fC, gl, !m.repeatX, !m.repeatY);
+				t.realWidth = canvas.width;
+				t.realHeight = canvas.height;
+				btx.cache[cacheID] = t;
+				return t;
+			} else {
+				texCanvas.push(canvas);
+				var t = loadTex(canvas, gl, !m.repeatX, !m.repeatY);
+				t.realWidth = canvas.width;
+				t.realHeight = canvas.height;
+				btx.cache[cacheID] = t;
+				return t;
+			}
+		} else {
+			return cached;
 		}
 	}
 
@@ -522,6 +550,10 @@ function loadWhiteTex(btx) { //examines the materials in the loaded model and ge
 	this.loadTexAnim = function(bta) {
 		texAnim = bta;
 		texFrame = 0;
+	}
+
+	this.loadTexPAnim = function(btp) {
+		texPAnim = btp;
 	}
 
 	this.setFrame = function(frame) {
@@ -635,17 +667,36 @@ function loadWhiteTex(btx) { //examines the materials in the loaded model and ge
 		var gl = nitroRender.gl;
 
 		//texture 0 SHOULD be bound, assuming the nitrorender program has been prepared
-        if (nitroRender.last.tex != tex[poly.mat]) {
-        	gl.bindTexture(gl.TEXTURE_2D, tex[poly.mat]); //load up material texture
-        	nitroRender.last.tex = tex[poly.mat];
+		var pmat = poly.mat;
+		var matname = model.materials.names[pmat]; //attach tex anim to mat with same name
+		if (texPAnim != null) {
+			var info = texPAnim.animData.objectData[modelind];
+			var anims = texPAnim.animData.objectData[modelind].data;
+			var animNum = anims.names.indexOf(matname);
+			if (animNum != -1) {
+				var offFrame = texFrame % info.duration;
+				//we got a match! it's wonderful :')
+				var anim = anims.objectData[animNum];
+				//look thru frames for the approprate point in the animation
+				for (var i=0; i<anim.frames.length; i++) {
+					if (offFrame >= anim.frames[i].time) {
+						tex[pmat] = cacheTex(btx == null ? bmd.tex : btx, anim.frames[i].tex, anim.frames[i].mat, model.materials.objectData[pmat]);
+					}
+				}
+			}
+		}
+
+        if (nitroRender.last.tex != tex[pmat]) {
+        	gl.bindTexture(gl.TEXTURE_2D, tex[pmat]); //load up material texture
+        	nitroRender.last.tex = tex[pmat];
         }
 
-		var material = model.materials.objectData[poly.mat];
+		var material = model.materials.objectData[pmat];
 		nitroRender.setAlpha(material.alpha)
 
 		if (texAnim != null) {
 			//generate and send texture matrix from data
-			var matname = model.materials.names[poly.mat]; //attach tex anim to mat with same name
+			var matname = model.materials.names[pmat]; //attach tex anim to mat with same name
 			var anims = texAnim.animData.objectData[modelind].data;
 			var animNum = anims.names.indexOf(matname);
 
@@ -666,7 +717,7 @@ function loadWhiteTex(btx) { //examines the materials in the loaded model and ge
         drawModelBuffer(modelBuffers[modelind][polyind], gl, shader);
 	}
 
-function generateMatrixStack(model, targ) { //this generates a matrix stack with the default bones. use nitroAnimator to pass custom matrix stacks using nsbca animations.
+	function generateMatrixStack(model, targ) { //this generates a matrix stack with the default bones. use nitroAnimator to pass custom matrix stacks using nsbca animations.
 		var matrices = [];
 
 		var objs = model.objects.objectData;
@@ -733,10 +784,11 @@ function loadTex(img, gl, clampx, clampy) { //general purpose function for loadi
 	gl.bindTexture(gl.TEXTURE_2D, texture);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
 
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 	if (clampx) gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     if (clampy) gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.generateMipmap(gl.TEXTURE_2D);
 
 	texture.width = img.width;
 	texture.height = img.height;

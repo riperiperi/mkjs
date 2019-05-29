@@ -36,17 +36,17 @@ window.ObjDecor = function(obji, scene) {
 		if (t.angle[2] != 0) mat4.rotateZ(mat, mat, t.angle[2]*(Math.PI/180));
 		if (t.angle[1] != 0) mat4.rotateY(mat, mat, t.angle[1]*(Math.PI/180));
 		if (t.angle[0] != 0) mat4.rotateX(mat, mat, t.angle[0]*(Math.PI/180));
-
-		if (anim != null) {
-			animMat = anim.setFrame(0, 0, animFrame++);
-		}
-
+		
 		mat4.scale(mat, mat, vec3.scale([], t.scale, 16));
 		res.mdl[0].draw(mat, pMatrix, animMat);
 	}
 
 	function update() {
-
+		res.mdl[0].setFrame(animFrame);
+		if (anim != null) {
+			animMat = anim.setFrame(0, 0, animFrame);
+		}
+		animFrame++;
 	}
 
 	function requireRes() { //scene asks what resources to load
@@ -75,7 +75,7 @@ window.ObjDecor = function(obji, scene) {
 			case 0x0138:
 				return {mdl:[{nsbmd:"GardenTree1.nsbmd"}]};
 			case 0x0139:
-				return {mdl:[{nsbmd:"kamome.nsbmd"}], other:[null, null, "kamone.nsbtp"]}; //animates using nsbtp, and uses route to move
+				return {mdl:[{nsbmd:"kamome.nsbmd"}], other:[null, null, "kamome.nsbtp"]}; //animates using nsbtp, and uses route to move
 
 			case 0x013A:
 				return {mdl:[{nsbmd:"CrossTree1.nsbmd"}]};
@@ -265,8 +265,12 @@ window.ObjDecor = function(obji, scene) {
 			if (r.other.length > 0 && r.other[0] != null) {
 				res.mdl[0].loadTexAnim(r.other[0]);
 			}
-			if (r.other.length > 1 && r.other[1] != null)
+			if (r.other.length > 1 && r.other[1] != null) {
 				anim = new nitroAnimator(r.mdl[0].bmd, r.other[1]);
+			}
+			if (r.other.length > 2 && r.other[2] != null) {
+				res.mdl[0].loadTexPAnim(r.other[2]);
+			}
 		}
 	}
 
