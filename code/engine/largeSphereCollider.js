@@ -14,12 +14,28 @@ window.lsc = new (function() {
 	this.sweepEllipse = sweepEllipse;
 	this.pointInTriangle = pointInTriangle; //expose this because its kinda useful
 
-	function raycast(pos, dir, kclO, error, ignoreList) { //used for shells, bananas and spammable items. Much faster than sphere sweep. Error used to avoid falling through really small seams between tris.
+	var t, colPlane, colPoint, emb, edge, colO, planeNormal;
+
+	function raycast(pos, dir, scn, error, ignoreList) { //used for shells, bananas and spammable items. Much faster than sphere sweep. Error used to avoid falling through really small seams between tris.
 		var error = (error==null)?0:error;
-		var t=1;
-		var tris = getTriList(pos, dir, kclO);
-		var colPlane = null;
-		var colPoint = null; //can be calculated from t, but we calculate it anyway so why not include
+		t=1;
+		var tris = getTriList(pos, dir, scn.kcl);
+		colPlane = null;
+		colPoint = null; //can be calculated from t, but we calculate it anyway so why not include
+		colO = null;
+
+		rayVTris(pos, dir, tris, null, ignoreList, null, error);
+
+		for (var i=0; i<scn.colEnt.length; i++) {
+			var c = scn.colEnt[i];
+			var col = c.getCollision();
+
+			if (vec3.distance(pos, c.pos) < c.colRad) {
+				rayVTris(pos, dir, col.tris, col.mat, ignoreList, c, error, col.frame);
+			}
+		}
+
+		/*
 		for (var i=0; i<tris.length; i++) {
 			//first, check if we intersect the plane within reasonable t.
 			//only if this happens do we check if the point is in the triangle.
@@ -29,7 +45,7 @@ window.lsc = new (function() {
 
 			if (ignoreList.indexOf(tri) != -1) continue;
 
-			var planeConst = -vec3.dot(tri.Normal, tri.Vertex1);
+			var planeConst = -vec3.dot(tri.Normal, tri.Vertices[0]);
 			var dist = vec3.dot(tri.Normal, pos) + planeConst;
 			var modDir = vec3.dot(tri.Normal, dir);
 			if (dist < 0 || modDir == 0) continue; //can't collide with back side of polygons! also can't intersect plane with ray perpendicular to plane
@@ -44,24 +60,72 @@ window.lsc = new (function() {
 				}
 			}
 		}
+		*/
 
 		if (colPlane != null) {
 			return {
 				t: t,
 				plane: colPlane,
 				colPoint: colPoint,
+				object: colO,
 				normal: colPlane.Normal
 			}
 		} else return null;
 	}
 
+	function rayVTris(pos, dir, tris, mat, ignoreList, targ, error, colFrame) {
+		for (var i=0; i<tris.length; i++) {
+			//first, check if we intersect the plane within reasonable t.
+			//only if this happens do we check if the point is in the triangle.
+			//we would also only do sphere sweep if this happens.
+			var tri = tris[i];
+			if (mat != null) {
+				if (tri.colFrame === colFrame && tri.cache) {
+					tri = tri.cache;
+				} else {
+					var oT = tri;
+					tri = modTri(tris[i], mat);
+					oT.cache = tri;
+					oT.colFrame = colFrame;
+				}
+			}
+
+			if (ignoreList.indexOf(tri) != -1) continue;
+
+			var planeConst = -vec3.dot(tri.Normal, tri.Vertices[0]);
+			var dist = vec3.dot(tri.Normal, pos) + planeConst;
+			var modDir = vec3.dot(tri.Normal, dir);
+			if (dist < 0 || modDir == 0) continue; //can't collide with back side of polygons! also can't intersect plane with ray perpendicular to plane
+			var newT = -dist/modDir;
+			if (newT>0 && newT<t) {
+				//we have a winner! check if the plane intersecion point is in the triangle.
+				var pt = vec3.add([], pos, vec3.scale([], dir, newT))
+				if (pointInTriangle(tri, pt, error)) {
+					t = newT;
+					colPlane = tri;
+					colPoint = pt; //result!
+					colO = targ;
+				}
+			}
+		}
+	}
+
+	function transformMat3Normal(out, a, m) {
+		var x = a[0], y = a[1], z = a[2];
+		out[0] = x * m[0] + y * m[4] + z * m[8];
+		out[1] = x * m[1] + y * m[5] + z * m[9];
+		out[2] = x * m[2] + y * m[6] + z * m[10];
+		return out;
+	}
+
 	function modTri(tri, mat) {
 		var obj = {};
-		obj.Vertex1 = vec3.transformMat4([], tri.Vertex1, mat);
-		obj.Vertex2 = vec3.transformMat4([], tri.Vertex2, mat);
-		obj.Vertex3 = vec3.transformMat4([], tri.Vertex3, mat);
+		obj.Vertices = [];
+		obj.Vertices[0] = vec3.transformMat4([], tri.Vertices[0], mat);
+		obj.Vertices[1] = vec3.transformMat4([], tri.Vertices[1], mat);
+		obj.Vertices[2] = vec3.transformMat4([], tri.Vertices[2], mat);
 
-		obj.Normal = vec3.transformMat3([], tri.Normal, mat3.fromMat4([], mat));
+		obj.Normal = transformMat3Normal([], tri.Normal, mat);
 		vec3.normalize(obj.Normal, obj.Normal);
 		obj.CollisionType = tri.CollisionType;
 		return obj;
@@ -69,16 +133,15 @@ window.lsc = new (function() {
 
 	function scaleTri(tri, eDim) {
 		var obj = {};
-		obj.Vertex1 = vec3.divide([], tri.Vertex1, eDim);
-		obj.Vertex2 = vec3.divide([], tri.Vertex2, eDim);
-		obj.Vertex3 = vec3.divide([], tri.Vertex3, eDim);
+		obj.Vertices = [];
+		obj.Vertices[0] = vec3.divide([], tri.Vertices[0], eDim);
+		obj.Vertices[1] = vec3.divide([], tri.Vertices[1], eDim);
+		obj.Vertices[2] = vec3.divide([], tri.Vertices[2], eDim);
 
 		obj.Normal = tri.Normal
 		obj.CollisionType = tri.CollisionType;
 		return obj;
 	}
-
-	var t, colPlane, colPoint, emb, edge, colO, planeNormal;
 
 	function sweepEllipse(pos, dir, scn, eDimensions, ignoreList) { //used for karts or things that need to occupy physical space.
 		t=1;
@@ -140,7 +203,7 @@ window.lsc = new (function() {
 			if (ignoreList.indexOf(oTri) != -1) continue;
 
 			var tri = (eDims)?scaleTri(tris[i], mat):modTri(tris[i], mat);
-			var planeConst = -vec3.dot(tri.Normal, tri.Vertex1);
+			var planeConst = -vec3.dot(tri.Normal, tri.Vertices[0]);
 			var dist = vec3.dot(tri.Normal, pos) + planeConst;
 			var modDir = vec3.dot(tri.Normal, dir);
 
@@ -200,14 +263,14 @@ window.lsc = new (function() {
 				}
 
 				//no inside intersection check vertices:
-				for (var j=1; j<=3; j++) {
-					var vert = vec3.sub([], pos, tri["Vertex"+j]);
+				for (var j=0; j<=2; j++) {
+					var vert = vec3.sub([], pos, tri.Vertices[j]);
 					var root = getSmallestRoot(vec3.dot(dir, dir), 2*vec3.dot(dir, vert), vec3.dot(vert, vert)-1, t);
 					if (root != null) {
 						t = root;
 						colPlane = oTri;
 						colO = targ;
-						colPoint = vec3.clone(tri["Vertex"+j]); //result!
+						colPoint = vec3.clone(tri.Vertices[j]); //result!
 						planeNormal = tri.Normal;
 						edge = false;
 					}
@@ -215,9 +278,9 @@ window.lsc = new (function() {
 
 				//... and lines
 
-				for (var j=1; j<=3; j++) {
-					var vert = tri["Vertex"+j];
-					var nextV = tri["Vertex"+((j%3)+1)];
+				for (var j=0; j<=2; j++) {
+					var vert = tri.Vertices[j];
+					var nextV = tri.Vertices[(j+1)%3];
 
 					var distVert = vec3.sub([], vert, pos);
 					var distLine = vec3.sub([], nextV, vert);
@@ -277,9 +340,9 @@ window.lsc = new (function() {
 
 	function pointInTriangle(tri, point, error) { //barycentric check
 		//compute direction vectors to the other verts and the point
-		var v0 = vec3.sub([], tri.Vertex3, tri.Vertex1);
-		var v1 = vec3.sub([], tri.Vertex2, tri.Vertex1);
-		var v2 = vec3.sub([], point, tri.Vertex1);
+		var v0 = vec3.sub([], tri.Vertices[2], tri.Vertices[0]);
+		var v1 = vec3.sub([], tri.Vertices[1], tri.Vertices[0]);
+		var v2 = vec3.sub([], point, tri.Vertices[0]);
 
 		//we need to find u and v across the two vectors v0 and v1 such that adding them will result in our point's position
 		//where the unit length of both vectors v0 and v1 is 1, the sum of both u and v should not exceed 1 and neither should be negative

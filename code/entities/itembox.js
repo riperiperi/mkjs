@@ -98,12 +98,15 @@ window.ItemBox = function(obji, scene) {
 	}
 
 	function sndUpdate(view) {
+		/*
 		t.soundProps.pos = vec3.transformMat4([], t.pos, view);
 		if (t.soundProps.lastPos != null) t.soundProps.vel = vec3.sub([], t.soundProps.pos, t.soundProps.lastPos);
 		else t.soundProps.vel = [0, 0, 0];
+		*/
 		t.soundProps.lastPos = t.soundProps.pos;
+		t.soundProps.pos = t.pos; //todo: reintroduce doppler via emulation
 
-		t.soundProps.refDistance = 192/1024;
+		t.soundProps.refDistance = 192;
 		t.soundProps.rolloffFactor = 1;
 	}
 

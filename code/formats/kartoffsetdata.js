@@ -42,7 +42,6 @@ window.kartoffsetdata = function(input) {
 				var pos = vec3.create();
 				pos[0] = view.getInt32(off, true)/4096;
 				pos[1] = view.getInt32(off+4, true)/4096;
-				console.log("charPos: "+pos[1]);
 				pos[2] = view.getInt32(off+8, true)/4096;
 				off += 12;
 				chars.push(pos);

@@ -223,6 +223,8 @@ window.nitroRender = new function() {
 	this.init = function(ctx) {
 		gl = ctx;
 		this.gl = gl;
+		this.billboardMat = mat4.create();
+		this.yBillboardMat = mat4.create();
 		
 		shaders = nitroShaders.compileShaders(gl);
 
@@ -233,7 +235,7 @@ window.nitroRender = new function() {
 	this.prepareShader = function() {
 		//prepares the shader so no redundant calls have to be made. Should be called upon every program change.
 		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 		this.last = {};
 		gl.activeTexture(gl.TEXTURE0);
         gl.uniform1i(this.nitroShader.samplerUniform, 0);
@@ -259,6 +261,12 @@ window.nitroRender = new function() {
 
 		this.setColMult([1, 1, 1, 1]);
 		this.prepareShader();
+	}
+
+	this.setShadBias = function(bias) {
+		var shader = shaders[1];
+		gl.uniform1f(shader.shadOffUniform, bias);
+		gl.uniform1f(shader.farShadOffUniform, bias);
 	}
 
 	this.resetShadOff = function() {
@@ -372,7 +380,7 @@ window.nitroRender = new function() {
 
 };
 
-function nitroModel(bmd, btx, remap) {
+function nitroModel(bmd, btx) {
 	var bmd = bmd;
 	this.bmd = bmd;
 	var thisObj = this;
@@ -399,7 +407,9 @@ function nitroModel(bmd, btx, remap) {
 	this.draw = draw;
 	this.drawPoly = externDrawPoly;
 	this.drawModel = externDrawModel;
+	this.getBoundingCollisionModel = getBoundingCollisionModel;
 	this.getCollisionModel = getCollisionModel;
+	this.baseMat = mat4.create();
 
 	modelBuffers = []
 	this.modelBuffers = modelBuffers;
@@ -407,10 +417,6 @@ function nitroModel(bmd, btx, remap) {
 	for (var i=0; i<bmd.modelData.objectData.length; i++) {
 		modelBuffers.push(new Array(bmd.modelData.objectData[i].polys.objectData.length));
 		matBuf.push({built: false, dat: new Float32Array(31*16)});
-	}
-
-	if (remap != null) {
-		setTextureRemap(remap);
 	}
 
 	if (btx != null) {
@@ -461,39 +467,45 @@ function nitroModel(bmd, btx, remap) {
 			var model = models[j];
 			var mat = model.materials.objectData
 			for (var i=0; i<mat.length; i++) {
-				var m = mat[i];
-				var texI = mat[i].tex;
-				var palI = mat[i].pal;
-				//remap below
-				var nTex = texMap.tex[texI];
-				var nPal = texMap.pal[palI];
-				if ((texI == null && nTex == null) || (palI == null && nPal == null)) {
-					debugger;
-					console.warn("WARNING: material "+i+" in model could not be assigned a texture.")
-
-					var fC = document.createElement("canvas");
-					fC.width = 2;
-					fC.height = 2;
-					var ctx = fC.getContext("2d")
-					ctx.fillStyle = "white";
-					ctx.fillRect(0,0,2,2);
-					texCanvas.push(fC);
-					var t = loadTex(fC, gl, !m.repeatX, !m.repeatY);
-					t.realWidth = 2;
-					t.realHeight = 2;
-					tex.push(t);
-
-					continue;
-				}
-
-				var truetex = (nTex==null)?texI:nTex;
-				var truepal = (nPal==null)?palI:nPal;
-				var cacheID = truetex+":"+truepal;
-				var cached = btx.cache[cacheID];
-
-                tex.push(cacheTex(btx, truetex, truepal, m));
+				mat[i].texInd = tex.length;
+				loadMatTex(mat[i], btx);
 			}
 		}
+	}
+
+	function loadMatTex(mat, btx, matReplace) {
+		var m = mat;
+		if (matReplace) m = matReplace;
+		var texI = m.texName;
+		var palI = m.palName;
+
+		if (texI == null || palI == null) {
+			debugger;
+			console.warn("WARNING: material "+i+" in model could not be assigned a texture.");
+			/*
+
+			var fC = document.createElement("canvas");
+			fC.width = 2;
+			fC.height = 2;
+			var ctx = fC.getContext("2d")
+			ctx.fillStyle = "white";
+			ctx.fillRect(0,0,2,2);
+			texCanvas.push(fC);
+			var t = loadTex(fC, gl, !mat.repeatX, !mat.repeatY);
+			t.realWidth = 2;
+			t.realHeight = 2;
+			tex.push(t);
+			*/
+
+			return;
+		}
+
+		var truetex = loadedTex.textureInfo.nameToIndex["$" + texI] || 0;
+		var truepal = loadedTex.paletteInfo.nameToIndex["$" + palI] || 0;
+		var cacheID = truetex+":"+truepal;
+		var cached = btx.cache[cacheID];
+
+        tex[mat.texInd] = cacheTex(btx, truetex, truepal, mat);
 	}
 
 	function cacheTex(btx, truetex, truepal, m) {
@@ -542,11 +554,6 @@ function nitroModel(bmd, btx, remap) {
 		}
 	}
 
-	function setTextureRemap(remap) {
-		texMap = remap;
-		if (loadedTex != null) loadTexture(loadedTex)
-	}
-
 	this.loadTexAnim = function(bta) {
 		texAnim = bta;
 		texFrame = 0;
@@ -558,6 +565,11 @@ function nitroModel(bmd, btx, remap) {
 
 	this.setFrame = function(frame) {
 		texFrame = frame;
+	}
+
+	this.setBaseMat = function(mat) {
+		thisObj.baseMat = mat;
+		thisObj.billboardID = -1;
 	}
 
 	function externDrawModel(mv, project, mdl) {
@@ -584,7 +596,7 @@ function nitroModel(bmd, btx, remap) {
 
 		var shader = nitroRender.nitroShader;
 
-		var mv = mat4.scale([], mv, [model.head.scale, model.head.scale, model.head.scale]);
+		//var mv = mat4.scale([], mv, [model.head.scale, model.head.scale, model.head.scale]);
 
 		gl.uniformMatrix4fv(shader.mvMatrixUniform, false, mv);
 		gl.uniformMatrix4fv(shader.pMatrixUniform, false, project);
@@ -603,7 +615,85 @@ function nitroModel(bmd, btx, remap) {
 		}
 	}
 
-	function getCollisionModel(modelind, polyind) { //simple func to get collision model for a model. used when I'm too lazy to define my own... REQUIRES TRI MODE ACTIVE!
+	function getBoundingCollisionModel(modelind, polyind) { //simple func to get collision model for a model. used when I'm too lazy to define my own... REQUIRES TRI MODE ACTIVE!
+		var model = bmd.modelData.objectData[modelind];
+		var poly = model.polys.objectData[polyind];
+		if (modelBuffers[modelind][polyind] == null) modelBuffers[modelind][polyind] = nitroRender.renderDispList(poly.disp, tex[poly.mat], (poly.stackID == null)?model.lastStackID:poly.stackID);
+
+		var tris = modelBuffers[modelind][polyind].strips[0].posArray;
+
+		var tC = tris.length/3;
+		var off = 0;
+		var min = [Infinity, Infinity, Infinity];
+		var max = [-Infinity, -Infinity, -Infinity];
+		for (var i=0; i<tC; i++) {
+			var tri = [tris[off++], tris[off++], tris[off++]];
+			for (var j=0; j<3; j++) {
+				if (tri[j] < min[j]) min[j] = tri[j];
+				if (tri[j] > max[j]) max[j] = tri[j];
+			}
+		}
+		//create the bounding box
+		out = [
+			{ //top
+				Vertices: [[max[0], max[1], max[2]], [max[0], max[1], min[2]], [min[0], max[1], min[2]]],
+				Normal: [0, 1, 0]
+			},
+			{
+				Vertices: [[min[0], max[1], min[2]], [min[0], max[1], max[2]], [max[0], max[1], max[2]]],
+				Normal: [0, 1, 0]
+			},
+
+			{ //bottom
+				Vertices: [[min[0], min[1], min[2]], [max[0], min[1], min[2]], [max[0], min[1], max[2]] ],
+				Normal: [0, -1, 0]
+			},
+			{
+				Vertices: [[max[0], min[1], max[2]], [min[0], min[1], max[2]], [min[0], min[1], min[2]] ],
+				Normal: [0, -1, 0]
+			},
+
+			{ //back (farthest z)
+				Vertices: [[max[0], max[1], max[2]], [max[0], min[1], max[2]], [min[0], min[1], max[2]]],
+				Normal: [0, 0, 1]
+			},
+			{
+				Vertices: [[min[0], min[1], max[2]], [min[0], max[1], max[2]], [max[0], max[1], max[2]]],
+				Normal: [0, 0, 1]
+			},
+
+			{ //front (closest z)
+				Vertices: [[min[0], min[1], min[2]], [max[0], min[1], min[2]], [max[0], max[1], min[2]]],
+				Normal: [0, 0, -1]
+			},
+			{
+				Vertices: [[max[0], max[1], min[2]], [min[0], max[1], min[2]], [min[0], min[1], min[2]]],
+				Normal: [0, 0, -1]
+			},
+
+			{ //right (pos x)
+				Vertices: [[max[0], max[1], max[2]], [max[0], min[1], max[2]], [max[0], min[1], min[2]]],
+				Normal: [1, 0, 0]
+			},
+			{
+				Vertices: [[max[0], min[1], min[2]], [max[0], max[1], min[2]], [max[0], max[1], max[2]]],
+				Normal: [1, 0, 0]
+			},
+
+			{ //left (neg x)
+				Vertices: [[-max[0], min[1], min[2]], [-max[0], min[1], max[2]], [-max[0], max[1], max[2]]],
+				Normal: [-1, 0, 0]
+			},
+			{
+				Vertices: [[-max[0], max[1], max[2]], [-max[0], max[1], min[2]], [-max[0], min[1], min[2]]],
+				Normal: [-1, 0, 0]
+			},
+		]
+		out.push()
+		return {dat:out, scale:model.head.scale};
+	}
+
+	function getCollisionModel(modelind, polyind, colType) { //simple func to get collision model for a model. used when I'm too lazy to define my own... REQUIRES TRI MODE ACTIVE!
 		if (collisionModel[modelind] == null) collisionModel[modelind] = [];
 		if (collisionModel[modelind][polyind] != null) return collisionModel[modelind][polyind];
 		var model = bmd.modelData.objectData[modelind];
@@ -617,14 +707,16 @@ function nitroModel(bmd, btx, remap) {
 		var off = 0;
 		for (var i=0; i<tC; i++) {
 			var t = {}
-			t.Vertex1 = [tris[off++], tris[off++], tris[off++]];
-			t.Vertex2 = [tris[off++], tris[off++], tris[off++]];
-			t.Vertex3 = [tris[off++], tris[off++], tris[off++]];
+			t.Vertices = [];
+			t.Vertices[0] = [tris[off++], tris[off++], tris[off++]];
+			t.Vertices[1] = [tris[off++], tris[off++], tris[off++]];
+			t.Vertices[2] = [tris[off++], tris[off++], tris[off++]];
 
 			//calculate normal
-			var v = vec3.sub([], t.Vertex2, t.Vertex1);
-			var w = vec3.sub([], t.Vertex3, t.Vertex1);
-			t.Normal = vec3.cross([], v, w)
+			var v = vec3.sub([], t.Vertices[1], t.Vertices[0]);
+			var w = vec3.sub([], t.Vertices[2], t.Vertices[0]);
+			t.Normal = vec3.cross([], v, w);
+			t.CollisionType = colType;
 			vec3.normalize(t.Normal, t.Normal);
 			out.push(t);
 		}
@@ -647,7 +739,7 @@ function nitroModel(bmd, btx, remap) {
 		}
 		var shader = nitroRender.nitroShader;
 
-		var mv = mat4.scale([], mv, [model.head.scale, model.head.scale, model.head.scale]);
+		//var mv = mat4.scale([], mv, [model.head.scale, model.head.scale, model.head.scale]);
 
 		gl.uniformMatrix4fv(shader.mvMatrixUniform, false, mv);
 		gl.uniformMatrix4fv(shader.pMatrixUniform, false, project);
@@ -678,9 +770,13 @@ function nitroModel(bmd, btx, remap) {
 				//we got a match! it's wonderful :')
 				var anim = anims.objectData[animNum];
 				//look thru frames for the approprate point in the animation
-				for (var i=0; i<anim.frames.length; i++) {
+				for (var i=anim.frames.length-1; i>=0; i--) {
 					if (offFrame >= anim.frames[i].time) {
+						loadMatTex(model.materials.objectData[pmat], btx == null ? bmd.tex : btx, anim.frames[i]);
+						/*
 						tex[pmat] = cacheTex(btx == null ? bmd.tex : btx, anim.frames[i].tex, anim.frames[i].mat, model.materials.objectData[pmat]);
+						*/
+						break;
 					}
 				}
 			}
@@ -692,7 +788,7 @@ function nitroModel(bmd, btx, remap) {
         }
 
 		var material = model.materials.objectData[pmat];
-		nitroRender.setAlpha(material.alpha)
+		nitroRender.setAlpha(material.alpha);
 
 		if (texAnim != null) {
 			//generate and send texture matrix from data
@@ -703,9 +799,7 @@ function nitroModel(bmd, btx, remap) {
 			if (animNum != -1) {
 				//we got a match! it's wonderful :')
 				var anim = anims.objectData[animNum];
-				var mat = mat3.create(); //material texture mat is ignored
-				mat3.scale(mat, mat, [anim.scaleS[(texFrame>>anim.frameStep.scaleS)%anim.scaleS.length], anim.scaleT[(texFrame>>anim.frameStep.scaleT)%anim.scaleT.length]]);
-				mat3.translate(mat, mat, [-anim.translateS[(texFrame>>anim.frameStep.translateS)%anim.translateS.length], anim.translateT[(texFrame>>anim.frameStep.translateT)%anim.translateT.length]]) //for some mystery reason I need to negate the S translation
+				var mat = matAtFrame(texFrame, anim);
 				gl.uniformMatrix3fv(shader.texMatrixUniform, false, mat);
 			} else {
 				gl.uniformMatrix3fv(shader.texMatrixUniform, false, material.texMat);
@@ -717,24 +811,52 @@ function nitroModel(bmd, btx, remap) {
         drawModelBuffer(modelBuffers[modelind][polyind], gl, shader);
 	}
 
+	function frameLerp(frame, step, values) {
+		if (values.length == 1) return values[0];
+		var i = (frame / (1 << step)) % 1;
+		var len = values.length
+		if (step > 0) len -= 1;
+		var frame1 = (frame>>step)%len;
+		var from = values[frame1];
+		var to = values[frame1+1] || values[frame1];
+		return to * i + from * (1-i);
+	}
+
+	function matAtFrame(frame, anim) {
+		var mat = mat3.create(); //material texture mat is ignored
+
+		mat3.scale(mat, mat, [frameLerp(frame, anim.frameStep.scaleS, anim.scaleS), frameLerp(frame, anim.frameStep.scaleT, anim.scaleT)]);
+		mat3.translate(mat, mat, [-frameLerp(frame, anim.frameStep.translateS, anim.translateS), frameLerp(frame, anim.frameStep.translateT, anim.translateT)]);
+
+		return mat;
+	}
+
 	function generateMatrixStack(model, targ) { //this generates a matrix stack with the default bones. use nitroAnimator to pass custom matrix stacks using nsbca animations.
 		var matrices = [];
 
 		var objs = model.objects.objectData;
 		var cmds = model.commands;
-		var curMat = mat4.create();
+		var curMat = mat4.clone(thisObj.baseMat);
 		var lastStackID = 0;
+		var highestUsed = -1;
 
 		for (var i=0; i<cmds.length; i++) {
 			var cmd = cmds[i];
+			if (cmd.copy != null) {
+				//copy this matrix to somewhere else, because it's bound and is going to be overwritten.
+				matrices[cmd.dest] = mat4.clone(matrices[cmd.copy]);
+				continue;
+			}
 			if (cmd.restoreID != null) curMat = mat4.clone(matrices[cmd.restoreID]);
 			var o = objs[cmd.obj];
 			mat4.multiply(curMat, curMat, o.mat);
 			if (o.billboardMode == 1) mat4.multiply(curMat, curMat, nitroRender.billboardMat);
 			if (o.billboardMode == 2) mat4.multiply(curMat, curMat, nitroRender.yBillboardMat);
+
 			if (cmd.stackID != null) {
 				matrices[cmd.stackID] = mat4.clone(curMat);
 				lastStackID = cmd.stackID;
+				if (lastStackID > highestUsed) highestUsed = lastStackID;
 			} else {
 				matrices[lastStackID] = mat4.clone(curMat);
 			}
@@ -742,10 +864,14 @@ function nitroModel(bmd, btx, remap) {
 
 		model.lastStackID = lastStackID;
 
+		var scale = [model.head.scale, model.head.scale, model.head.scale];
 		targ.set(matBufEmpty);
 		var off=0;
-		for (var i=0; i<31; i++) {
-			if (matrices[i] != null) targ.set(matrices[i], off);
+		for (var i=0; i<=highestUsed; i++) {
+			if (matrices[i] != null) {
+				mat4.scale(matrices[i], matrices[i], scale);
+				targ.set(matrices[i], off);
+			}
 			off += 16;
 		}
 

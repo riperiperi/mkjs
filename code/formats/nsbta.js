@@ -120,6 +120,7 @@ window.nsbta = function(input) {
 				if (i == 2) obj[prop[i]].push(data2);
 			} else { //data is found at offset
 				frames = frames>>obj.frameStep[prop[i]];
+				if (obj.frameStep[prop[i]] > 0) frames++; //one extra frame, for interpolation
 				//frames -= 1;
 				var off = base + value-8;
 				for (var j=0; j<frames*((i==2)?2:1); j++) {

@@ -84,7 +84,7 @@ window.kcl = function(input, mkwii) {
 		while (offset < octreeOffset) {
 			planes.push(new Plane(view, offset));
 			offset += 0x10; 
-			var vert = planes[planes.length-1].Vertex1;
+			var vert = planes[planes.length-1].Vertices[0];
 			if (vert[0] < minx) minx=vert[0];
 			if (vert[0] > maxx) maxx=vert[0];
 			if (vert[2] < minz) minz=vert[2];
@@ -177,9 +177,9 @@ window.kcl = function(input, mkwii) {
 			var plane = planes[i];
 			ctx.beginPath();
 
-			ctx.moveTo(plane.Vertex1[0], plane.Vertex1[2]);
-			ctx.lineTo(plane.Vertex2[0], plane.Vertex2[2]);
-			ctx.lineTo(plane.Vertex3[0], plane.Vertex3[2]);
+			ctx.moveTo(plane.Vertices[0][0], plane.Vertices[0][2]);
+			ctx.lineTo(plane.Vertices[1][0], plane.Vertices[1][2]);
+			ctx.lineTo(plane.Vertices[2][0], plane.Vertices[2][2]);
 
 			ctx.closePath();
 			ctx.stroke();
@@ -253,7 +253,8 @@ window.kcl = function(input, mkwii) {
 
 	function Plane(view, offset) {
 		this.Len = readBigDec(view, offset, mkwiiMode);
-		this.Vertex1 = readVert(view.getUint16(offset+0x4, end), view);
+		this.Vertices = [];
+		this.Vertices[0] = readVert(view.getUint16(offset+0x4, end), view);
 		this.Normal = readNormal(view.getUint16(offset+0x6, end), view);
 		this.NormalA = readNormal(view.getUint16(offset+0x8, end), view);
 		this.NormalB = readNormal(view.getUint16(offset+0xA, end), view);
@@ -263,8 +264,8 @@ window.kcl = function(input, mkwii) {
 		var crossA = vec3.cross(vec3.create(), this.NormalA, this.Normal);
 		var crossB = vec3.cross(vec3.create(), this.NormalB, this.Normal);
 
-		this.Vertex2 = vec3.scaleAndAdd(vec3.create(), this.Vertex1, crossB, (this.Len/vec3.dot(crossB, this.NormalC)));
-		this.Vertex3 = vec3.scaleAndAdd(vec3.create(), this.Vertex1, crossA, (this.Len/vec3.dot(crossA, this.NormalC)));
+		this.Vertices[1] = vec3.scaleAndAdd(vec3.create(), this.Vertices[0], crossB, (this.Len/vec3.dot(crossB, this.NormalC)));
+		this.Vertices[2] = vec3.scaleAndAdd(vec3.create(), this.Vertices[0], crossA, (this.Len/vec3.dot(crossA, this.NormalC)));
 	}
 
 	function readVert(num, view) {

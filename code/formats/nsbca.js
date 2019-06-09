@@ -15,7 +15,7 @@ window.nsbca = function(input) {
 
 	var mainOff;
 	var animData;
-	var speeds = [1.0, 0.5, 1/3];
+	var speeds = [1.0, 0.5, 1/4];
 	var mainObj = this;
 
 	if (input != null) {
@@ -72,10 +72,10 @@ window.nsbca = function(input) {
 
 	function readTrans(view, off, obj) {
 		var flag = view.getUint16(off, true); //--zyx-Sr-RZYX-T-
-
 		off += 4;
 
 		var transform = {};
+		transform.flag = flag;
 
 		if (!((flag>>1) & 1)) { //T: translation
 			var translate = [[], [], []]; //store translations in x,y,z arrays
@@ -96,7 +96,7 @@ window.nsbca = function(input) {
 					inf.off = view.getUint32(off+4, true);
 
 					var extra = (obj.unknown != 3)?0:(obj.frames-inf.endFrame); 
-					var length = Math.floor((obj.frames+extra)*inf.speed);
+					var length = Math.ceil((inf.endFrame-inf.startFrame)*inf.speed);
 					var w = (inf.halfSize)?2:4;
 
 					var off2 = obj.baseOff+inf.off;
@@ -132,7 +132,7 @@ window.nsbca = function(input) {
 				inf.off = view.getUint32(off+4, true);
 				var extra = (obj.unknown != 3)?0:(obj.frames-inf.endFrame); 
 				//florian's rotate code seems to ignore this extra value. I'll need more examples of nsbca to test this more thoroughly.
-				var length = Math.floor((obj.frames+extra)*inf.speed);
+				var length = Math.ceil((inf.endFrame-inf.startFrame)*inf.speed);
 
 				var off2 = obj.baseOff+inf.off;
 				try {
@@ -173,7 +173,7 @@ window.nsbca = function(input) {
 					inf.off = view.getUint32(off+4, true);
 
 					var extra = (obj.unknown != 3)?0:(obj.frames-inf.endFrame); 
-					var length = Math.ceil((obj.frames+extra)*inf.speed);
+					var length = Math.ceil((inf.endFrame-inf.startFrame)*inf.speed);
 					var w = ((inf.halfSize)?2:4);
 
 					var off2 = obj.baseOff+inf.off;
@@ -211,21 +211,26 @@ window.nsbca = function(input) {
 			};
 		} else {
 			var off2 = obj.baseOff+obj.off2+ind*10; //jump to rotation data
-			var d1 = view.getInt16(off2, true);
-			var d2 = view.getInt16(off2+2, true);
-			var d3 = view.getInt16(off2+4, true);
-			var d4 = view.getInt16(off2+6, true);
-			var d5 = view.getInt16(off2+8, true);
+			var d1 = view.getUint16(off2, true);
+			var d2 = view.getUint16(off2+2, true);
+			var d3 = view.getUint16(off2+4, true);
+			var d4 = view.getUint16(off2+6, true);
+			var d5 = view.getUint16(off2+8, true);
 
 			var i6 = ((d5&7)<<12) | ((d1&7)<<9) | ((d2&7)<<6) | ((d3&7)<<3) | ((d4&7));
-			if (i6&4096) i6 = (-8192)+i6;
+			//if (i6&4096) i6 = (-8192)+i6;
 
-			var v1 = [d1>>3, d2>>3, d3>>3]
-			var v2 = [d4>>3, d5>>3, i6]
+			var v1 = [d1>>3, d2>>3, d3>>3];
+			var v2 = [d4>>3, d5>>3, i6];
+
+			for (var i=0; i<3; i++) {
+				if (v1[i] & 4096) v1[i] -= 8192;
+				if (v2[i] & 4096) v2[i] -= 8192;
+			}
 
 			vec3.scale(v1, v1, 1/4096);
 			vec3.scale(v2, v2, 1/4096);
-			var v3 = vec3.cross([], v1, v2)
+			var v3 = vec3.cross([], v1, v2);
 
 			var mat = [
 				v1[0], v1[1], v1[2],

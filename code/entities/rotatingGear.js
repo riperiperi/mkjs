@@ -41,11 +41,15 @@ window.ObjGear = function(obji, scene) {
 	t.angle = 0;
 	t.dir = (t.wB1 == 0)
 
+	t.colFrame = 0;
+
+	var colRes;
+
 	var dirVel = 0;
 
 	var prevMat;
 	var curMat;
-	setMat();
+	var colMat = mat4.create();
 	prevMat = curMat;
 
 	function setMat() {
@@ -59,6 +63,8 @@ window.ObjGear = function(obji, scene) {
 		mat4.rotateX(mat, mat, obji.angle[0]*(Math.PI/180));
 
 		mat4.rotateY(mat, mat, t.angle);
+		mat4.scale(colMat, mat, [colRes.scale, colRes.scale, colRes.scale]);
+		t.colFrame++;
 		curMat = mat;
 	}
 
@@ -119,43 +125,24 @@ window.ObjGear = function(obji, scene) {
 		}
 	}
 
+	function cloneKCL(kcl) {
+		return JSON.parse(JSON.stringify(kcl));
+	}
+
 	function provideRes(r) {
 		res = r; //...and gives them to us. :)
+		colRes = cloneKCL(res.mdl[0].getCollisionModel(0, 0));
 	}
 
 	function getCollision() {
-		var obj = {};
-		var inf = res.mdl[0].getCollisionModel(0, 0);
-		obj.tris = inf.dat;
-
-		var mat = mat4.translate([], mat4.create(), t.pos);
-		mat4.scale(mat, mat, vec3.mul([], [16*inf.scale, 16*inf.scale, 16*inf.scale], t.scale));
-
-		mat4.rotateY(mat, mat, obji.angle[1]*(Math.PI/180));
-		mat4.rotateX(mat, mat, obji.angle[0]*(Math.PI/180));
-		mat4.rotateY(mat, mat, t.angle);
-
-		obj.mat = mat;
-		return obj;
+		return { tris: colRes.dat, mat: colMat, frame: t.colFrame };
 	}
 
 	function moveWith(obj) { //used for collidable objects that move.
-
 		//the most general way to move something with an object is to multiply its position by the inverse mv matrix of that object, and then the new mv matrix.
 
 		vec3.transformMat4(obj.pos, obj.pos, mat4.invert([], prevMat))
 		vec3.transformMat4(obj.pos, obj.pos, curMat)
-
-		/*var p = vec3.sub([], obj.pos, t.pos);
-
-		if (obji.ID == 0x00D1) { //todo: maybe something more general
-			vec3.transformMat4(p, p, mat4.rotateX([], mat4.create(), dirVel));
-			vec3.add(obj.pos, t.pos, p);
-		} else {
-			vec3.transformMat4(p, p, mat4.rotateY([], mat4.create(), dirVel));
-			vec3.add(obj.pos, t.pos, p);
-			obj.physicalDir -= dirVel;
-		}*/
 	}
 
 }

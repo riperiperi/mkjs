@@ -406,6 +406,7 @@ window.spa = function(input) {
                 var dat = texView.getUint8(off++)
                 col = readPalColour(palView, palOff, dat&31, trans);
                 col[3] = (dat>>5)*(255/7);
+                premultiply(col);
 
             } else if (format == 2) { //2 bit pal
                 if (i%4 == 0) databuf = texView.getUint8(off++);
@@ -426,6 +427,7 @@ window.spa = function(input) {
                 var dat = texView.getUint8(off++)
                 col = readPalColour(palView, palOff, dat&7, trans);
                 col[3] = (dat>>3)*(255/31);
+                premultiply(col);
 
             } else if (format == 7) { //raw color data
                 col = texView.getUint16(off, true);
@@ -434,6 +436,7 @@ window.spa = function(input) {
                 colourBuffer[2] = Math.round((((col>>10)&31)/31)*255)
                 colourBuffer[3] = Math.round((col>>15)*255);
                 col = colourBuffer;
+                premultiply(col);
                 off += 2;
 
             } else {
@@ -444,6 +447,12 @@ window.spa = function(input) {
         }
         ctx.putImageData(img, 0, 0)
         return canvas;
+    }
+
+    function premultiply(col) {
+        col[0] *= col[3]/255;
+        col[1] *= col[3]/255;
+        col[2] *= col[3]/255;
     }
 
     function readCompressedTex(tex) { //format 5, 4x4 texels. I'll keep this well documented so it's easy to understand.

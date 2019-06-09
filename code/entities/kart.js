@@ -73,6 +73,11 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	this.getPosition = getPosition;
 	this.playCharacterSound = playCharacterSound;
 
+	//functions for external objects to trigger
+	this.damage = damage;
+	this.damageTime = 0;
+	this.damageType = -1;
+
 	this.trackAttach = null; //a normal for the kart to attach to (loop)
 	this.boostMT = 0;
 	this.boostNorm = 0;
@@ -399,7 +404,8 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				mat4.rotateX(mat, mat, c.angle[0]*(-Math.PI/180));
 
 				k.pos = vec3.clone(c2.pos);
-				vec3.add(k.pos, k.pos, vec3.transformMat4([], [0,16,16], mat));
+				vec3.add(k.pos, k.pos, vec3.transformMat4([], [0,16,32], mat));
+				k.airTime = 4;
 
 				k.physicalDir = (180-c2.angle[1])*(Math.PI/180);
 				k.angle = k.physicalDir;
@@ -438,7 +444,6 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				}
 			}
 		} else { //default kart mode
-
 			if (k.OOB > 0) {
 				playCharacterSound(0);
 				var current = checkpoints[k.checkPointNumber];
@@ -466,180 +471,176 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			var top = params.topSpeed*effect.topSpeedMul; //if you let go of accel, drift ends anyway, so always accel in drift.
 
 			var boosting = (k.boostNorm + k.boostMT)>0;
-
-			if (boosting) {
-				var top2
-				if (k.boostNorm>0){
-					top2 = params.topSpeed*1.3;
-					k.boostNorm--;
-				} else {
-					top2 = params.topSpeed*((effect.topSpeedMul >= 1)?1.3:effect.topSpeedMul);
-				}
-
-				if (k.boostMT>0) {
-					k.boostMT--;
-				}
-
-				if (k.speed <= top2) {
-					k.speed += 1;
-					if (k.speed > top2) k.speed = top2;
-				} else {
-					k.speed *= 0.95;
-				}
-			}
-
-			//kart controls
-			if (k.drifting) {
-				if ((onGround) && !(input.accel && input.drift && (k.speed > 2 || !k.driftLanded))) {
-					//end drift, execute miniturbo
-					k.drifting = false;
-					clearWheelParticles();
-					if (sounds.powerslide != null) {
-						nitroAudio.instaKill(sounds.powerslide);
-						sounds.powerslide = null;
-					}
-					if (k.driftPSMode == 3) {
-						k.boostMT = params.miniTurbo;
-					}
-					k.driftPSMode = 0;
-					k.driftPSTick = 0;
-				}
-
-				if (k.driftMode == 0) {
-					if (input.turn > 0.30) {
-						k.driftMode = 2;
-					} else if (input.turn < -0.30) {
-						k.driftMode = 1;
-					}
-				} else {
-					if (k.driftLanded) {
-						var change = (((k.driftMode-1.5)*Math.PI/1.5)-k.driftOff)*0.05;
-						k.driftOff += change;
-						k.physicalDir -= change;
+			if (k.specialControlHandler != null) k.specialControlHandler();
+			else {
+				if (boosting) {
+					var top2
+					if (k.boostNorm>0){
+						top2 = params.topSpeed*1.3;
+						k.boostNorm--;
+					} else {
+						top2 = params.topSpeed*((effect.topSpeedMul >= 1)?1.3:effect.topSpeedMul);
 					}
 
-					//if we're above the initial y position, add a constant turn with a period of 180 frames.
-					if (!k.driftLanded && k.ylock>=0) {
-						k.physicalDir += (Math.PI*2/180)*(k.driftMode*2-3);
+					if (k.boostMT>0) {
+						k.boostMT--;
+					}
+
+					if (k.speed <= top2) {
+						k.speed += 1;
+						if (k.speed > top2) k.speed = top2;
+					} else {
+						k.speed *= 0.95;
 					}
 				}
 
-				if (onGround) {
-					if (!k.driftLanded) {
-						if (k.driftMode == 0) {
-							k.drifting = false;
-							clearWheelParticles();
+				//kart controls
+				if (k.drifting) {
+					if ((onGround) && !(input.accel && input.drift && (k.speed > 2 || !k.driftLanded))) {
+						//end drift, execute miniturbo
+						endDrift();
+						if (k.driftPSMode == 3) {
+							k.boostMT = params.miniTurbo;
 						}
-						else {
-							k.driftPSMode = 0;
-							k.driftPSTick = 0;
-							k.driftLanded = true;
-							if (k.drifting) setWheelParticles(20, 1); //20 = smoke, 1 = drift priority
+						k.driftPSMode = 0;
+						k.driftPSTick = 0;
+					}
+
+					if (k.driftMode == 0) {
+						if (input.turn > 0.30) {
+							k.driftMode = 2;
+						} else if (input.turn < -0.30) {
+							k.driftMode = 1;
+						}
+					} else {
+						if (k.driftLanded) {
+							var change = (((k.driftMode-1.5)*Math.PI/1.5)-k.driftOff)*0.05;
+							k.driftOff += change;
+							k.physicalDir -= change;
+						}
+
+						//if we're above the initial y position, add a constant turn with a period of 180 frames.
+						if (!k.driftLanded && k.ylock>=0) {
+							k.physicalDir += (Math.PI*2/180)*(k.driftMode*2-3);
 						}
 					}
-					if (k.drifting) {
 
+					if (onGround) {
+						if (!k.driftLanded) {
+							if (k.driftMode == 0) {
+								endDrift();
+							}
+							else {
+								k.driftPSMode = 0;
+								k.driftPSTick = 0;
+								k.driftLanded = true;
+								if (k.drifting) setWheelParticles(20, 1); //20 = smoke, 1 = drift priority
+							}
+						}
+						if (k.drifting) {
+
+							if (!boosting) {
+								if (k.speed <= top) {
+									k.speed += (k.speed/top > params.driftAccelSwitch)?params.driftAccel2:params.driftAccel1;
+									if (k.speed > top) k.speed = top;
+								} else {
+									k.speed *= 0.95;
+								}
+							}
+
+							var turn = ((k.driftMode == 1)?(input.turn-1):(input.turn+1))/2; 
+
+							k.physicalDir += params.driftTurnRate*turn+((k.driftMode == 1)?-1:1)*(50/32768)*Math.PI; //what is this mystery number i hear you ask? well my friend, this is the turn rate for outward drift.
+
+							//miniturbo code
+							if (input.turn != 0) {
+								var inward = ((input.turn>0) == k.driftMode-1); //if we're turning 
+
+								switch (k.driftPSMode) {
+									case 0: //dpad away from direction for 10 frames 
+										if (!inward) k.driftPSTick++;
+										else if (k.driftPSTick > 9) {
+											k.driftPSMode++;
+											k.driftPSTick = 1;
+
+											//play blue spark sound, flare
+											setWheelParticles(126, 2); //126 = blue flare, 2 = flare priority
+											var blue = nitroAudio.playSound(210, {}, 0, k);
+											blue.gainN.gain.value = 2;
+
+										} else k.driftPSTick = 0;
+										break;
+									case 1: //dpad toward direction for 10 frames 
+										if (inward) k.driftPSTick++;
+										else if (k.driftPSTick > 9) {
+											k.driftPSMode++;
+											k.driftPSTick = 1;
+
+										} else k.driftPSTick = 0;
+										break;
+									case 2: //dpad away from direction for 10 frames 
+										if (!inward) k.driftPSTick++;
+										else if (k.driftPSTick > 9) {
+											k.driftPSMode++;
+											k.driftPSTick = 1;
+											//play red sparks sound, full MT!
+											setWheelParticles(22, 2); //22 = red flare, 2 = flare priority
+											setWheelParticles(17, 1); //17 = red mt, 1 = drift priority ... 18 is sparks that come out - but their mode is not working yet (spark mode)
+											sounds.powerslide = nitroAudio.playSound(209, {}, 0, k);
+											sounds.powerslide.gainN.gain.value = 2;
+										} else k.driftPSTick = 0;
+										break;
+									case 3: //turbo charged
+										break;
+								}
+							}
+						}
+					}
+				}
+
+				if (!k.drifting) {
+					if (onGround) {
+						var effect = params.colParam[groundEffect];
 						if (!boosting) {
-							if (k.speed <= top) {
-								k.speed += (k.speed/top > params.driftAccelSwitch)?params.driftAccel2:params.driftAccel1;
-								if (k.speed > top) k.speed = top;
+							if (input.accel) {
+								if (k.speed <= top) {
+									k.speed += (k.speed/top > params.accelSwitch)?params.accel2:params.accel1;
+									if (k.speed > top) k.speed = top;
+								} else {
+									k.speed *= 0.95;
+								}
 							} else {
-								k.speed *= 0.95;
+								k.speed *= params.decel;
 							}
 						}
 
-						var turn = ((k.driftMode == 1)?(input.turn-1):(input.turn+1))/2; 
-
-						k.physicalDir += params.driftTurnRate*turn+((k.driftMode == 1)?-1:1)*(50/32768)*Math.PI; //what is this mystery number i hear you ask? well my friend, this is the turn rate for outward drift.
-
-						//miniturbo code
-						if (input.turn != 0) {
-							var inward = ((input.turn>0) == k.driftMode-1); //if we're turning 
-
-							switch (k.driftPSMode) {
-								case 0: //dpad away from direction for 10 frames 
-									if (!inward) k.driftPSTick++;
-									else if (k.driftPSTick > 9) {
-										k.driftPSMode++;
-										k.driftPSTick = 1;
-
-										//play blue spark sound, flare
-										setWheelParticles(126, 2); //126 = blue flare, 2 = flare priority
-										var blue = nitroAudio.playSound(210, {}, 0, k);
-										blue.gainN.gain.value = 2;
-
-									} else k.driftPSTick = 0;
-									break;
-								case 1: //dpad toward direction for 10 frames 
-									if (inward) k.driftPSTick++;
-									else if (k.driftPSTick > 9) {
-										k.driftPSMode++;
-										k.driftPSTick = 1;
-
-									} else k.driftPSTick = 0;
-									break;
-								case 2: //dpad away from direction for 10 frames 
-									if (!inward) k.driftPSTick++;
-									else if (k.driftPSTick > 9) {
-										k.driftPSMode++;
-										k.driftPSTick = 1;
-										//play red sparks sound, full MT!
-										setWheelParticles(22, 2); //22 = red flare, 2 = flare priority
-										setWheelParticles(17, 1); //17 = red mt, 1 = drift priority
-										sounds.powerslide = nitroAudio.playSound(209, {}, 0, k);
-										sounds.powerslide.gainN.gain.value = 2;
-									} else k.driftPSTick = 0;
-									break;
-								case 3: //turbo charged
-									break;
-							}
+						if ((input.accel && k.speed >= 0) || (k.speed > 0.1)) {
+							k.physicalDir += params.turnRate*input.turn;
+						} else if (	k.speed < -0.1) {
+							k.physicalDir -= params.turnRate*input.turn;
 						}
-					}
-				}
-			}
 
-			if (!k.drifting) {
-				if (onGround) {
-					var effect = params.colParam[groundEffect];
-					if (!boosting) {
-						if (input.accel) {
-							if (k.speed <= top) {
-								k.speed += (k.speed/top > params.accelSwitch)?params.accel2:params.accel1;
-								if (k.speed > top) k.speed = top;
-							} else {
-								k.speed *= 0.95;
-							}
-						} else {
-							k.speed *= params.decel;
+						if (input.drift) {
+							ylvel = 1.25;
+							k.vel[1] += 1.25;
+							k.airTime = 4;
+							k.drifting = true;
+							k.driftLanded = false;
+							k.driftMode = 0;
+							k.ylock = 0;
+							onGround = false;
+
+							var boing = nitroAudio.playSound(207, {transpose: -4}, 0, k);
+							boing.gainN.gain.value = 2;
 						}
-					}
-
-					if ((input.accel && k.speed >= 0) || (k.speed > 0.1)) {
-						k.physicalDir += params.turnRate*input.turn;
-					} else if (	k.speed < -0.1) {
-						k.physicalDir -= params.turnRate*input.turn;
-					}
-
-					if (input.drift) {
-						ylvel = 1.25;
-						k.vel[1] += 1.25;
-						k.airTime = 4;
-						k.drifting = true;
-						k.driftLanded = false;
-						k.driftMode = 0;
-						k.ylock = 0;
-						onGround = false;
-
-						var boing = nitroAudio.playSound(207, {transpose: -4}, 0, k);
-						boing.gainN.gain.value = 2;
-					}
-				} else {
-					if (input.drift) {
-						ylvel = 0;
-						k.drifting = true;
-						k.driftLanded = false;
-						k.driftMode = 0;
-						k.ylock = -0.001;
+					} else {
+						if (input.drift) {
+							ylvel = 0;
+							k.drifting = true;
+							k.driftLanded = false;
+							k.driftMode = 0;
+							k.ylock = -0.001;
+						}
 					}
 				}
 			}
@@ -708,8 +709,6 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 			//move kart. 
 
-
-
 			var steps = 0;
 			var remainingT = 1;
 			var baseVel = k.vel;
@@ -754,6 +753,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		var mat = mat4.create();
 		mat4.translate(mat, mat, k.pos);
 		k.mat = mat4.mul(mat, mat, k.basis);
+		if (k.damageMat != null) mat4.mul(mat, mat, k.damageMat);
 
 		if (input.item) {
 			scene.items.addItem(0, scene.karts.indexOf(k), {})
@@ -761,6 +761,83 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 		updateKartSound(newSoundMode, input);
 		positionChanged(lastPos, k.pos);
+	}
+
+	function endDrift() {
+		k.drifting = false;
+		clearWheelParticles();
+		if (sounds.powerslide != null) {
+			nitroAudio.instaKill(sounds.powerslide);
+			sounds.powerslide = null;
+		}
+	}
+
+	function damage(damageType) {
+		if (k.damageType >= damageType) {
+			return; //we are already damaged
+		}
+		//TODO: check invuln state
+		k.specialControlHandler = damagedControls;
+		playCharacterSound((damageType == 0) ? 1 : 0);
+		k.damageType = damageType;
+		k.ylock = 0;
+
+		k.anim.setAnim(k.charRes.spinA);
+		k.animMode = "spin";
+
+		if (k.drifting) {
+			endDrift();
+		}
+		k.boostMT = 0;
+		k.boostNorm = 0;
+
+		switch (damageType) {
+			case 0:
+				k.damageTime = 40;
+				break;
+			case 1:
+				k.damageTime = 80;
+				k.vel[1] += 3;
+				ylvel = 3;
+				k.airTime = 4;
+				break;
+			case 2:
+				k.damageTime = 105;
+				k.vel[1] += 8;
+				ylvel = 8;
+				k.airTime = 4;
+				break;
+		}
+	}
+
+	function damagedControls(kart) {
+		if (--k.damageTime == 0) {
+			k.anim.setAnim(k.charRes.driveA);
+			k.animMode = "drive";
+			k.specialControlHandler = null;
+			k.damageType = -1;
+			k.damageMat = null;
+		}
+		vec3.scale(k.vel, k.vel, 0.98);
+		k.speed *= 0.98;
+
+		var total = 40;
+		switch (k.damageType) {
+			case 1:
+				total = 80;
+				break;
+			case 2:
+				total = 105;
+				break;
+		}
+		var anim = 1 - (k.damageTime / total);
+
+		k.damageMat = mat4.create();
+		var flip = ((k.damageType%2) == 1)? 1 : -1;
+		var animOff = Math.min(1, anim*1.75);
+		mat4.rotateX(k.damageMat, k.damageMat, Math.PI*2 * animOff * k.damageType * flip);
+		if (k.damageType == 0) mat4.rotateY(k.damageMat, k.damageMat, Math.PI*-2 * anim);
+		else mat4.rotateY(k.damageMat, k.damageMat, Math.PI/12 * Math.sin(animOff*Math.PI));
 	}
 
 	function triggerCannon(id) {
@@ -923,7 +1000,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 		k.kartColVel[1] = 0;
 		//play this kart's horn
-		nitroAudio.playSound(192 + charRes.sndOff/14, { volume: 2 }, 0, k);
+		nitroAudio.playSound(193 + charRes.sndOff/14, { volume: 2 }, 0, k);
 	}
 
 	function fixDir(dir) {
@@ -940,6 +1017,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	}
 
 	function updateKartSound(mode, input) {
+		if (!k.local) return; //for now, don't play kart sounds from other racers.
 		var turn = (onGround && !k.drifting)?(1-Math.abs(input.turn)/11):1;
 		var transpose = (mode == 0)?0:(22*turn*Math.min(1.3, k.speed/params.topSpeed));
 
@@ -1028,12 +1106,15 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	}
 
 	function sndUpdate(view) {
+		/*
 		k.soundProps.pos = vec3.transformMat4([], k.pos, view);
 		if (k.soundProps.lastPos != null) k.soundProps.vel = vec3.sub([], k.soundProps.pos, k.soundProps.lastPos);
 		else k.soundProps.vel = [0, 0, 0];
+		*/
 		k.soundProps.lastPos = k.soundProps.pos;
+		k.soundProps.pos = k.pos; //todo: reintroduce doppler via emulation
 
-		k.soundProps.refDistance = 192/1024;
+		k.soundProps.refDistance = 192;
 		k.soundProps.rolloffFactor = 1;
 
 		var calcVol = (k.soundProps.refDistance / (k.soundProps.refDistance + k.soundProps.rolloffFactor * (Math.sqrt(vec3.dot(k.soundProps.pos, k.soundProps.pos)) - k.soundProps.refDistance)));
@@ -1080,7 +1161,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		var angle = Math.acos(vec3.dot(vec3.scale(vec3.create(), k.gravity, -1/gravS), n));
 		var adjustPos = true;
 
-		if (colType == MKDS_COLTYPE.OOB || colType == MKDS_COLTYPE.FALL) {
+		if (MKDS_COLTYPE.GROUP_OOB.indexOf(colType) != -1) {
 			k.OOB = 1;
 		}
 
@@ -1101,12 +1182,18 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			}
 			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), adjN, proj)); 
 			
+			if (colType == MKDS_COLTYPE.KNOCKBACK_DAMAGE && k.damageType == -1) {
+				if (dat.object.vel) vec3.add(k.vel, k.vel, dat.object.vel); 
+				vec3.add(k.vel, k.vel, vec3.scale(vec3.create(), adjN, 1.25)); 
+				k.damage(MKDSCONST.DAMAGE_FLIP);
+			}
 
 			//convert back to angle + speed to keep change to kart vel
 
 			var v = k.vel;
 			k.speed = Math.sqrt(v[0]*v[0]+v[2]*v[2]);
 			k.angle = Math.atan2(v[0], -v[2]);
+			stuckTo = dat.object;
 		} else if (MKDS_COLTYPE.GROUP_ROAD.indexOf(colType) != -1) {
 			//sliding plane
 			if (MKDS_COLTYPE.GROUP_BOOST.indexOf(colType) != -1) {
@@ -1117,7 +1204,8 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 
 			if (k.vel[1] > 0) k.vel[1] = 0;
 			var proj = vec3.dot(k.vel, an);
-			if (!stick && proj < -4 && k.vel[1] < -2) { proj -= 1.5; }
+			if (k.damageType > 0) proj *= 1.7;
+			else if (!stick && proj < -4 && k.vel[1] < -2) { proj -= 1.5; }
 			vec3.sub(k.vel, k.vel, vec3.scale(vec3.create(), an, proj));
 
 			if (stick) {

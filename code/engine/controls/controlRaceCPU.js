@@ -45,6 +45,8 @@ window.controlRaceCPU = function(nkm) {
 	var destConst;
 	var destPoint;
 
+	var item = false;
+
 	function fetchInput() {
 		//basically as a cpu, we're really dumb and need a constant supply of points to drive to.
 		//battle mode AI is a lot more complex, but since we're only going in one direction it can be kept simple.
@@ -83,6 +85,7 @@ window.controlRaceCPU = function(nkm) {
 		offTrans += 1/240;
 
 		if (offTrans >= 1) chooseNewOff();
+		item = !item;
 
 		return {
 			accel: accel, //x

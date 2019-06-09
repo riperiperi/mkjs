@@ -10,7 +10,7 @@ window.fileStore = new (function(){
                      || window.mozIndexedDB
                      || window.shimIndexedDB;
 
-		var request = indexedDB.open("MKJS_DB", 1);
+		var request = indexedDB.open("MKJS-DB", 1);
 		request.onerror = window.onerror;
 
 		request.onsuccess = function(event) {
@@ -37,6 +37,18 @@ window.fileStore = new (function(){
 		request.onsuccess = function(event) {
 			if (request.result == null) downloadGame(null, callback);
 			else callback(request.result.data);
+		};
+	}
+
+	function validateFiles() {
+		var transaction = db.transaction(["files"]);
+		var objectStore = transaction.objectStore("files");
+		var request = objectStore.get("mkds.nds");
+		request.onerror = function(event) {
+			alert("Fatal database error!");
+		};
+		request.onsuccess = function(event) {
+			if (request.result == null) alert("Locally storing files failed!");
 		};
 	}
 
@@ -77,6 +89,7 @@ window.fileStore = new (function(){
 			callback(dat);
 		};
 		request.onsuccess = function(event) {
+			validateFiles();
 			callback(dat);
 		};
 	}

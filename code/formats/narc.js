@@ -5,10 +5,34 @@
 // by RHY3756547
 //
 
+// for reading from multiple narcs as one. (eg. Race.narc, Race_us.narc)
+window.narcGroup = function(files) {
+	this.getFile = getFile;
+	this.list = list;
+
+	function getFile(name) {
+		for (var i=0; i<files.length; i++) {
+			var file = files[i].getFile(name);
+			if (file != null) return file;
+		}
+		console.error("File not found: "+name);
+		return null;
+	}
+
+	function list() {
+		var result = [];
+		for (var i=0; i<files.length; i++) {
+			files[i].list(result);
+		}
+		return result;
+	}
+}
+
 window.narc = function(input) {
 
 	this.load = load;
 	this.getFile = getFile;
+	this.list = list;
 
 	var arc = this;
 	var handlers = [];
@@ -17,8 +41,6 @@ window.narc = function(input) {
 		mouseX = evt.pageX;
 		mouseY = evt.pageY;
 	}
-
-	this.scopeEval = function(code) {return eval(code)} //for debug purposes
 
 	function load(buffer) {
 		arc.buffer = buffer; //we will use this data in the future.
@@ -82,6 +104,22 @@ window.narc = function(input) {
 		}
 		console.error("Path is not a file: "+name);
 		return null; //incomplete path; we ended on a directory, not a file!
+	}
+
+	function list(files, curDir, path) {
+		path = path || "/";
+		files = files || [];
+		var table = arc.sections["BTNF"].directories;
+		curDir = curDir || table[0].entries; //root
+
+		for (var i=0; i<curDir.length; i++) {
+			if (curDir[i].dir) {
+				list(files, table[curDir[i].id-0xF000].entries, path+curDir[i].name+"/");
+			} else {
+				files.push(path + curDir[i].name);
+			}
+		}
+		return files;
 	}
 
 	function readFileWithID(id) {

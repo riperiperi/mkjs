@@ -2,19 +2,20 @@
 
 window.KartItems = function(kart, scene) {
 	var t = this;
-	t.heldItem = null; //of type Item
+	t.heldItem = null; //held item, or item that is bound to us. (bound items have hold type 'func', eg. triple shell)
 	t.currentItem = null; //string name for item
 	t.specificItem = null;
 	t.empty = true;
 	t.cycleTime = 0;
 	t.totalTime = 230;
+
 	var maxItemTime = 230;
 	var minItemTime = 80;
 	var carouselSfx = null;
 	var lastItemState = false;
 	var holdAppearDelay = 15;
 
-    var hurtExplodeDelay = 105 //turn right slightly, huge double backflip, small bounces.
+    var hurtExplodeDelay = 105; //turn right slightly, huge double backflip, small bounces.
 	var hurtFlipDelay = 80; //turn right slightly, bounce twice, forward flip
 	var hurtSpinDelay = 40; //counter clockwise spin
 
@@ -43,8 +44,22 @@ window.KartItems = function(kart, scene) {
 		}
 	}
 
+	function createItem() {
+		var item = scene.items.createItem(t.currentItem, kart);
+		return item;
+	}
+
+	function release(input) {
+		if (t.heldItem != null) {
+			t.heldItem.release(input.airTurn);
+		}
+		t.heldItem = null;
+		kart.playCharacterSound(7);
+	}
+
 	function update(input) {
 		var pressed = (input.item && !lastItemState);
+		var released = (lastItemState && !input.item);
 		if (!t.empty) {
 			if (t.currentItem == null) {
 				//carousel
@@ -53,24 +68,48 @@ window.KartItems = function(kart, scene) {
 					if (carouselSfx != null) nitroAudio.kill(carouselSfx);
 
 					//decide on an item
-					var item = "koura_g";
+					var item = "banana"; //koura_g, banana, f_box, koura_group, koura_group-bomb-7
 					sfx((specialItems.indexOf(item) == -1) ? 63 : 64);
 					t.currentItem = item;
 				} else {
 					//if item button is pressed, we speed up the carousel
-					if (pressed) {
+					if (pressed && t.heldItem == null) {
 						t.totalTime = Math.max(minItemTime, t.totalTime - 20);
 					}
 				}
-			} else {
+			} else if (t.heldItem == null) {
 				if (pressed) {
 					//fire?
-					t.currentItem = null;
-					t.empty = true;
-					kart.playCharacterSound(7);
+					t.heldItem = createItem();
+					//t.currentItem = null;
+					//t.empty = true;
+
+					if (t.heldItem.canBeHeld()) {
+						//begin holding
+					} else {
+						release(input);
+					}
+					pressed = false;
 				}
 			}
+		}
 
+		//todo: if held item has been destroyed, stop holding it.
+
+		if (t.heldItem != null) {
+			if (t.heldItem.dead) {
+				t.heldItem = null;
+			} else {
+				//t.heldItem.updateHold(kart);
+				if (released) {
+					if (t.heldItem.canBeHeld() !== 'func') release(input);
+				} else if (pressed) {
+					//special release: triple shells, bananas. object stays bound when released
+					t.heldItem.release(input.airTurn);
+					kart.playCharacterSound(7);
+					if (t.heldItem.dead) t.heldItem = null;
+				}
+			}
 		}
 		lastItemState = input.item;
 	}

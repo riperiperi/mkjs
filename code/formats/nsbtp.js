@@ -38,7 +38,11 @@ window.nsbtp = function(input) {
 
 	var texTotal;
 	var palTotal;
+	var texNamesOff;
+	var palNamesOff;
 
+	var texNames;
+	var palNames;
 
 	function load(input) {
 		var view = new DataView(input);
@@ -96,13 +100,35 @@ window.nsbtp = function(input) {
 		var duration = view.getUint16(offset, true);
 		texTotal = view.getUint8(offset+2);
 		palTotal = view.getUint8(offset+3);
-		var unknown = view.getUint16(offset+4, true);
-		var unknown2 = view.getUint16(offset+6, true);
+		texNamesOff = view.getUint16(offset+4, true);
+		palNamesOff = view.getUint16(offset+6, true);
+
+		var nameOffset = matOff + texNamesOff;
+		texNames = [];
+		//read 16char tex names
+		for (var i=0; i<texTotal; i++) {
+			var name = "";
+			for (var j=0; j<16; j++) {
+				name += readChar(view, nameOffset++)
+			}
+			texNames[i] = name;
+		}
+
+		nameOffset = matOff + palNamesOff;
+		palNames = [];
+		//read 16char pal names
+		for (var i=0; i<palTotal; i++) {
+			var name = "";
+			for (var j=0; j<16; j++) {
+				name += readChar(view, nameOffset++)
+			}
+			palNames[i] = name;
+		}
 
 		//...then another nitro
 		var data = nitro.read3dInfo(view, offset+8, matInfoHandler);
 
-		return {data: data, nextoff: data.nextoff, texTotal:texTotal, palTotal:palTotal, unknown:unknown, unknown2:unknown2, duration:duration};
+		return {data: data, nextoff: data.nextoff, texTotal:texTotal, palTotal:palTotal, duration:duration, texNames: texNames, palNames: palNames};
 	}
 
 	function matInfoHandler(view, offset, base) {
@@ -124,9 +150,9 @@ window.nsbtp = function(input) {
 		// 16char texname
 		//then (frame of these)
 		// 16char palname
+		// texture animations are bound to the material via the name of this block.
 
-		var frames = view.getUint16(offset, true);
-		obj.matinfo = view.getUint16(offset+2, true);
+		var frames = view.getUint32(offset, true);
 		obj.flags = view.getUint16(offset+4, true);
 		var offset2 = view.getUint16(offset+6, true);
 		offset += 8;
@@ -135,32 +161,15 @@ window.nsbtp = function(input) {
 		offset = matOff + offset2;
 		//info and timing for each frame
 		for (var i=0; i<frames; i++) {
-			obj.frames[i] = {
+			var entry = {
 				time: view.getUint16(offset, true),
-				tex: view.getUint8(offset+2),
-				mat: view.getUint8(offset+3),
+				tex: view.getUint8(offset+2), //index into names?
+				pal: view.getUint8(offset+3), //index into pal names?
 			}
+			entry.texName = texNames[entry.tex];
+			entry.palName = palNames[entry.pal];
+			obj.frames.push(entry);
 			offset += 4;
-		}
-
-        obj.texNames = [];
-		//read 16char tex names
-		for (var i=0; i<texTotal; i++) {
-			var name = "";
-			for (var j=0; j<16; j++) {
-				name += readChar(view, offset++)
-			}
-			obj.texNames[i] = name;
-		}
-
-		obj.palNames = [];
-		//read 16char pal names
-		for (var i=0; i<palTotal; i++) {
-			var name = "";
-			for (var j=0; j<16; j++) {
-				name += readChar(view, offset++)
-			}
-			obj.palNames[i] = name;
 		}
 		return obj;
 	}

@@ -74,8 +74,19 @@ window.nsbtx = function(input, tex0) {
 		paletteInfo = nitro.read3dInfo(view, mainOff + palInfoOff, palInfoHandler);
 		textureInfo = nitro.read3dInfo(view, mainOff + texInfoOff, texInfoHandler);
 
+		buildNameToIndex(paletteInfo);
+		buildNameToIndex(textureInfo);
+
 		thisObj.paletteInfo = paletteInfo;
 		thisObj.textureInfo = textureInfo;
+	}
+
+	function buildNameToIndex(info) {
+		var nameToIndex = {};
+		for (var i=0; i<info.names.length; i++) {
+			nameToIndex["$" + info.names[i]] = i;
+		}
+		info.nameToIndex = nameToIndex;
 	}
 
 	function readTexWithPal(textureId, palId) {
@@ -106,6 +117,7 @@ window.nsbtx = function(input, tex0) {
 				var dat = texView.getUint8(off++)
 				col = readPalColour(palView, palOff, dat&31, trans);
 				col[3] = (dat>>5)*(255/7);
+				premultiply(col);
 
 			} else if (format == 2) { //2 bit pal
 				if (i%4 == 0) databuf = texView.getUint8(off++);
@@ -126,6 +138,7 @@ window.nsbtx = function(input, tex0) {
 				var dat = texView.getUint8(off++)
 				col = readPalColour(palView, palOff, dat&7, trans);
 				col[3] = (dat>>3)*(255/31);
+				premultiply(col);
 
 			} else if (format == 7) { //raw color data
 				col = texView.getUint16(off, true);
@@ -134,6 +147,7 @@ window.nsbtx = function(input, tex0) {
 				colourBuffer[2] = Math.round((((col>>10)&31)/31)*255)
 				colourBuffer[3] = Math.round((col>>15)*255);
 				col = colourBuffer;
+				premultiply(col);
 				off += 2;
 
 			} else {
@@ -145,6 +159,12 @@ window.nsbtx = function(input, tex0) {
 		ctx.putImageData(img, 0, 0)
 		return canvas;
 	}
+
+	function premultiply(col) {
+        col[0] *= col[3]/255;
+        col[1] *= col[3]/255;
+        col[2] *= col[3]/255;
+    }
 
 	function readCompressedTex(tex, pal) { //format 5, 4x4 texels. I'll keep this well documented so it's easy to understand.
 		var off = tex.texOffset;

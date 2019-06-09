@@ -34,7 +34,7 @@ window.GreenShell = function(scene, owner, time, itemID, cliID, params) {
 		var posSeg = vec3.clone(t.pos);
 		var ignoreList = [];
 		while (steps++ < 10 && remainingT > 0.01) {
-			var result = lsc.raycast(posSeg, velSeg, scene.kcl, 0.05, ignoreList);
+			var result = lsc.raycast(posSeg, velSeg, kcl, 0.05, ignoreList);
 			if (result != null) {
 				colResponse(posSeg, velSeg, result, ignoreList)
 				remainingT -= result.t;
@@ -87,7 +87,9 @@ window.GreenShell = function(scene, owner, time, itemID, cliID, params) {
 
 			var v = t.vel;
 			t.angle = Math.atan2(v[0], -v[2]);
-
+			item.safeKart = null;
+		} else if (colType == MKDS_COLTYPE.OOB || colType == MKDS_COLTYPE.FALL) {
+			if (item.deadTimer == 0) item.deadTimer++;
 		} else if (MKDS_COLTYPE.GROUP_ROAD.indexOf(colType) != -1) {
 			//sliding plane
 			var proj = vec3.dot(t.vel, n);

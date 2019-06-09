@@ -113,7 +113,8 @@ window.nitroShaders = new (function() {
 	}\n\
 	\n\
 	void main(void) {\n\
-		vec4 col = texture2D(uSampler, vTextureCoord)*color;\n\
+		vec4 colorPM = vec4(color.rgb * color.a, color.a);\n\
+		vec4 col = texture2D(uSampler, vTextureCoord)*colorPM;\n\
 		\n\
 		vec2 ldNorm = abs((lightDist.xy)-vec2(0.5, 0.5));\n\
 		float dist = max(ldNorm.x, ldNorm.y);\n\

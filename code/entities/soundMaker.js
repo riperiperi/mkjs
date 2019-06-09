@@ -44,16 +44,20 @@ window.ObjSoundMaker = function(obji, scene) {
 	}
 
 	function sndUpdate(view) {
-		t.soundProps.pos = vec3.transformMat4([], t.pos, view);
-		t.soundProps.pos = [0, 0, Math.sqrt(vec3.dot(t.soundProps.pos, t.soundProps.pos))]
+		//t.soundProps.pos = vec3.transformMat4([], t.pos, view);
+		//t.soundProps.pos = [0, 0, Math.sqrt(vec3.dot(t.soundProps.pos, t.soundProps.pos))]
 		//if (t.soundProps.lastPos != null) t.soundProps.vel = vec3.sub([], t.soundProps.pos, t.soundProps.lastPos);
 		//else t.soundProps.vel = [0, 0, 0];
 		//t.soundProps.lastPos = t.soundProps.pos;
 
-		t.soundProps.refDistance = 1024/1024;
+		t.soundProps.pos = t.pos; //todo: when reintroducing doppler, disable it on this source
+
+		t.soundProps.refDistance = 1024;
 		//t.soundProps.rolloffFactor = 1;
 
-		var calcVol = (t.soundProps.refDistance / (t.soundProps.refDistance + t.soundProps.rolloffFactor * (t.soundProps.pos[2] - t.soundProps.refDistance)));
+		var relPos = vec3.transformMat4([], t.pos, view);
+
+		var calcVol = (t.soundProps.refDistance / (t.soundProps.refDistance + t.soundProps.rolloffFactor * (relPos[2] - t.soundProps.refDistance)));
 
 		if (calcVol<threshold) {
 			if (sound != null) {

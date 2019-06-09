@@ -99,12 +99,14 @@ window.MKDS_COLTYPE = new (function(){
 	this.STICKY = 0x0D; //sets gravity to negative this plane's normal until the object hasn't collided for a few frames.
 	this.SMALLJUMP = 0x0E; //choco island 2's disaster ramps
 	this.CANNON = 0x0F; //activates cannon. basic effect id is the cannon to use.
-	this.UNKNOWN = 0x10; //it is a mystery...
+	this.WALLOOB = 0x10; //like a wall. normally only appears oob, but doesn't seem to have any special behaviour apart from maybe slowing you down more.
 	this.FALLSWATER = 0x11; //points to falls object in nkm, gets motion parameters from there.
 	this.BOOST2 = 0x12;
 	this.LOOP = 0x13; //like sticky but with boost applied. see rainbow road ds
 	this.SOUNDROAD = 0x14;
 	this.RR_SPECIAL_WALL = 0x15;
+
+	this.KNOCKBACK_DAMAGE = 0x1F;
 
 	this.GROUP_ROAD = [
 		this.ROAD, this.OFFROAD1, this.OFFROAD2, this.OFFROAD3, this.OFFROAD4, this.SLIPPERY, this.BOOST,
@@ -117,15 +119,21 @@ window.MKDS_COLTYPE = new (function(){
 		this.JUMP_PAD, this.STICKY, this.SMALLJUMP, this.FALLSWATER, this.BOOST2, this.LOOP, this.SOUNDROAD,
 		this.OOB, this.OFFROADMAIN,
 
-		this.WALL, this.WALL2, this.RR_SPECIAL_WALL
+		this.WALL, this.WALL2, this.WALLOOB, this.RR_SPECIAL_WALL,
+
+		this.KNOCKBACK_DAMAGE
 	]
 
 	this.GROUP_WALL = [
-		this.WALL, this.WALL2, this.RR_SPECIAL_WALL
+		this.WALL, this.WALL2, this.WALLOOB, this.RR_SPECIAL_WALL, this.KNOCKBACK_DAMAGE
 	]
 
 	this.GROUP_BOOST = [
 		this.BOOST, this.BOOST2, this.LOOP
+	]
+
+	this.GROUP_OOB = [
+		this.OOB, this.FALL
 	]
 
 	this.PHYS_MAP = new Array(31);
@@ -194,7 +202,7 @@ window.MKDS_COLTYPE = new (function(){
 
 			{drift: MKDS_COLSOUNDS.DRIFT_ASPHALT, brake: MKDS_COLSOUNDS.BRAKE, land: MKDS_COLSOUNDS.LAND_GRASS, drive: MKDS_COLSOUNDS.DRIVE_GRASS, particle: 32},
 
-			{drift: MKDS_COLSOUNDS.DRIFT_SAND, brake: MKDS_COLSOUNDS.BRAKE_SAND, land: MKDS_COLSOUNDS.LAND_SAND, drive: MKDS_COLSOUNDS.DRIVE_SAND, particle: 28},
+			{drift: MKDS_COLSOUNDS.DRIFT_SAND, brake: MKDS_COLSOUNDS.BRAKE_SAND, land: MKDS_COLSOUNDS.LAND_SAND, drive: MKDS_COLSOUNDS.DRIVE_SAND, particle: 40}, //sky garden cloud
 			{drift: MKDS_COLSOUNDS.DRIFT_SAND, brake: MKDS_COLSOUNDS.BRAKE_SAND, land: MKDS_COLSOUNDS.LAND_SAND, drive: MKDS_COLSOUNDS.DRIVE_SAND, particle: 28},
 			{drift: MKDS_COLSOUNDS.DRIFT_ASPHALT, brake: MKDS_COLSOUNDS.BRAKE, land: MKDS_COLSOUNDS.LAND_SNOW, particle:112}, //snow
 			{},
@@ -263,7 +271,7 @@ window.MKDS_COLTYPE = new (function(){
 			{hit: MKDS_COLSOUNDS.HIT_ICE},
 		],
 
-		0x10: //wall 3
+		0x10: //wall oob
 		[
 			{hit: MKDS_COLSOUNDS.HIT_CONCRETE}, 
 			{},

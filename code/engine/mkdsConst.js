@@ -8,8 +8,8 @@
 window.MKDSCONST = new (function() {
 
 	this.DAMAGE_SPIN = 0;
-	this.DAMAGE_FLIP = 0;
-	this.DAMAGE_EXPLODE = 0;
+	this.DAMAGE_FLIP = 1;
+	this.DAMAGE_EXPLODE = 2;
 
 	this.COURSEDIR = "/data/Course/";
 

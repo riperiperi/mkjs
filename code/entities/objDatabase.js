@@ -75,7 +75,7 @@ window.objDatabase = new (function(){
 		t[0x0195] = ObjBus;
 
 
-		t[0x00CC] = ObjDecor; //DEBUG: pianta bridge
+		t[0x00CC] = ObjBridge; //DEBUG: pianta bridge
 		t[0x000D] = ObjDecor; //DEBUG: puddle
 
 		t[0x0158] = ObjDecor; //DEBUG: airship (routed)

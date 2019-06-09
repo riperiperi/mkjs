@@ -42,9 +42,24 @@ window.nitroAnimator = function(bmd, bca) {
 		return bca.animData.objectData[anim].frames;
 	}
 
+	function getFrames(anim, length, frame, totalLength) {
+		//totalLength (realtime)
+		//startFrame (realtime)
+		//endFrame (realtime)
+		//frame is between 0 and totalLength
+
+		var f = Math.max(0, (Math.min(frame, anim.endFrame) - anim.startFrame) * anim.speed); //speed relative time
+		var end = Math.floor((anim.endFrame - anim.startFrame) * anim.speed);
+		var realEnd = Math.min(length-1, end);
+		return [Math.min(realEnd, Math.floor(f)), Math.min(realEnd, Math.ceil(f)), f%1];
+	}
+
 	function setFrame(anim, modelind, frame) {
 
 		var b = bca.animData.objectData[anim];
+
+		var totalLength = getLength(anim);
+		frame %= getLength(anim);
 
 		var fLow = Math.floor(frame);
 		var fHigh = Math.ceil(frame);
@@ -64,27 +79,21 @@ window.nitroAnimator = function(bmd, bca) {
 			if (a.translate != null) {
 				translate = [];
 				if (a.tlExtra[0] != null) {
-					var f = frame * a.tlExtra[0].speed;
-					var fLow = Math.floor(f)%a.translate[0].length;
-					var fHigh = Math.ceil(f)%a.translate[0].length;
-					var p = f%1;
-					translate[0] = a.translate[0][fHigh]*(p) + a.translate[0][fLow]*(1-p);
+					var f = getFrames(a.tlExtra[0], a.translate[0].length, frame, totalLength);
+					var p = f[2];
+					translate[0] = a.translate[0][f[0]]*(1-p) + a.translate[0][f[1]]*(p);
 				} else translate[0] = a.translate[0][0];
 
 				if (a.tlExtra[1] != null) {
-					var f = frame * a.tlExtra[1].speed;
-					var fLow = Math.floor(f)%a.translate[1].length;
-					var fHigh = Math.ceil(f)%a.translate[1].length;
-					var p = f%1;
-					translate[1] = a.translate[1][fHigh]*(p) + a.translate[1][fLow]*(1-p);
+					var f = getFrames(a.tlExtra[1], a.translate[1].length, frame, totalLength);
+					var p = f[2];
+					translate[1] = a.translate[1][f[0]]*(1-p) + a.translate[1][f[1]]*(p);
 				} else translate[1] = a.translate[1][0];
 
 				if (a.tlExtra[2] != null) {
-					var f = frame * a.tlExtra[2].speed;
-					var fLow = Math.floor(f)%a.translate[2].length;
-					var fHigh = Math.ceil(f)%a.translate[2].length;
-					var p = f%1;
-					translate[2] = a.translate[2][fHigh]*(p) + a.translate[2][fLow]*(1-p);
+					var f = getFrames(a.tlExtra[2], a.translate[2].length, frame, totalLength);
+					var p = f[2];
+					translate[2] = a.translate[2][f[0]]*(1-p) + a.translate[2][f[1]]*(p);
 				} else translate[2] = a.translate[2][0];
 			} else {
 				translate = fa.translate;
@@ -93,13 +102,11 @@ window.nitroAnimator = function(bmd, bca) {
 			var rotate;
 			if (a.rotate != null) {
 				if (a.rotExtra != null) {
-					var f = frame * a.rotExtra.speed;
-					var fLow = Math.floor(f)%a.rotate.length;
-					var fHigh = Math.ceil(f)%a.rotate.length;
-					var p = f%1;
+					var f = getFrames(a.rotExtra, a.rotate.length, frame, totalLength);
+					var p = f[2];
 
-					var r1 = parseRotation(a.rotate[fLow]);
-					var r2 = parseRotation(a.rotate[fHigh]);
+					var r1 = parseRotation(a.rotate[f[0]]);
+					var r2 = parseRotation(a.rotate[f[1]]);
 					rotate = lerpMat3(r1, r2, p);
 				} else {
 					rotate = parseRotation(a.rotate[0]);
@@ -112,27 +119,21 @@ window.nitroAnimator = function(bmd, bca) {
 			if (a.scale != null) {
 				scale = [];
 				if (a.scExtra[0] != null) {
-					var f = frame * a.scExtra[0].speed;
-					var fLow = Math.floor(f)%a.scale[0].length;
-					var fHigh = Math.ceil(f)%a.scale[0].length;
-					var p = f%1;
-					scale[0] = a.scale[0][fHigh].s1*(p) + a.scale[0][fLow].s1*(1-p);
+					var f = getFrames(a.scExtra[0], a.scale[0].length, frame, totalLength);
+					var p = f[2];
+					scale[0] = a.scale[0][f[0]].s1*(1-p) + a.scale[0][f[1]].s1*(p);
 				} else scale[0] = a.scale[0][0].s1;
 
 				if (a.scExtra[1] != null) {
-					var f = frame * a.scExtra[1].speed;
-					var fLow = Math.floor(f)%a.scale[1].length;
-					var fHigh = Math.ceil(f)%a.scale[1].length;
-					var p = f%1;
-					scale[1] = a.scale[1][fHigh].s1*(p) + a.scale[1][fLow].s1*(1-p);
+					var f = getFrames(a.scExtra[1], a.scale[1].length, frame, totalLength);
+					var p = f[2];
+					scale[1] = a.scale[1][f[0]].s1*(1-p) + a.scale[1][f[1]].s1*(p);
 				} else scale[1] = a.scale[1][0].s1;
 
 				if (a.scExtra[2] != null) {
-					var f = frame * a.scExtra[2].speed;
-					var fLow = Math.floor(f)%a.scale[2].length;
-					var fHigh = Math.ceil(f)%a.scale[2].length;
-					var p = f%1;
-					scale[2] = a.scale[2][fHigh].s1*(p) + a.scale[2][fLow].s1*(1-p);
+					var f = getFrames(a.scExtra[2], a.scale[2].length, frame, totalLength);
+					var p = f[2];
+					scale[2] = a.scale[2][f[0]].s1*(1-p) + a.scale[2][f[1]].s1*(p);
 				} else scale[2] = a.scale[2][0].s1;
 			} else {
 				scale = fa.scale;
@@ -154,9 +155,15 @@ window.nitroAnimator = function(bmd, bca) {
 		var cmds = model.commands;
 		var curMat = mat4.create();
 		var lastStackID = 0;
+		var highestUsed = -1;
 
 		for (var i=0; i<cmds.length; i++) {
 			var cmd = cmds[i];
+			if (cmd.copy != null) {
+				//copy this matrix to somewhere else, because it's bound and is going to be overwritten.
+				matrices[cmd.dest] = mat4.clone(matrices[cmd.copy]);
+				continue;
+			}
 			if (cmd.restoreID != null) curMat = mat4.clone(matrices[cmd.restoreID]);
 			var o = objs[cmd.obj];
 			mat4.multiply(curMat, curMat, objMats[cmd.obj]);
@@ -165,6 +172,7 @@ window.nitroAnimator = function(bmd, bca) {
 			if (cmd.stackID != null) {
 				matrices[cmd.stackID] = mat4.clone(curMat);
 				lastStackID = cmd.stackID;
+				if (lastStackID > highestUsed) highestUsed = lastStackID;
 			} else {
 				matrices[lastStackID] = mat4.clone(curMat);
 			}
@@ -172,10 +180,14 @@ window.nitroAnimator = function(bmd, bca) {
 
 		model.lastStackID = lastStackID;
 
+		var scale = [model.head.scale, model.head.scale, model.head.scale];
 		targ.set(matBufEmpty);
 		var off=0;
-		for (var i=0; i<31; i++) {
-			if (matrices[i] != null) targ.set(matrices[i], off);
+		for (var i=0; i<=highestUsed; i++) {
+			if (matrices[i] != null) {
+				mat4.scale(matrices[i], matrices[i], scale);
+				targ.set(matrices[i], off);
+			}
 			off += 16;
 		}
 

@@ -207,6 +207,8 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 		}
 		entsToRemove = [];
 		var mat = scn.camera.getView(scn, nitroRender.getViewWidth(), nitroRender.getViewHeight());
+
+		nitroAudio.updateListener(mat.pos, mat.mv);
 		frame++;
 	}
 

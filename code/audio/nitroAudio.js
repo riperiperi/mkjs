@@ -18,6 +18,7 @@ window.nitroAudio = new (function() {
 	t.kill = kill;
 	t.init = init;
 	t.instaKill = instaKill;
+	t.updateListener = updateListener;
 
 	t.sdat = null;
 
@@ -31,6 +32,19 @@ window.nitroAudio = new (function() {
 
 		SSEQWaveCache.init(sdat, ctx);
 		t.sdat = sdat;
+	}
+
+	function updateListener(pos, view) {
+		var listener = ctx.listener;
+		listener.positionX.value = pos[0];
+		listener.positionY.value = pos[1];
+		listener.positionZ.value = pos[2];
+		listener.forwardX.value = view[8];
+		listener.forwardY.value = -view[9];
+		listener.forwardZ.value = -view[10];
+		listener.upX.value = view[4];
+		listener.upY.value = view[5];
+		listener.upZ.value = view[6];
 	}
 
 	function tick() {
@@ -76,6 +90,7 @@ window.nitroAudio = new (function() {
 			output.connect(sound.gainN);
 			sound.panner = output;
 
+			if (sound.obj.soundProps == null) sound.obj.soundProps = obj;
 			updatePanner(sound.panner, sound.obj.soundProps);
 		} else {
 			output = ctx.createGain();
@@ -105,9 +120,10 @@ window.nitroAudio = new (function() {
 		if (panner == null || soundProps == null) return;
 		if (soundProps.pos != null) panner.setPosition(soundProps.pos[0], soundProps.pos[1], soundProps.pos[2]);
 		//if (soundProps.vel != null) panner.setVelocity(soundProps.vel[0], soundProps.vel[1], soundProps.vel[2]);
-		if (soundProps.refDistance != null) panner.refDistance = soundProps.refDistance;
+
+		panner.refDistance = soundProps.refDistance || 192;
 		if (soundProps.panningModel != null) panner.panningModel = soundProps.panningModel;
-		if (soundProps.rolloffFactor != null) panner.rolloffFactor = soundProps.rolloffFactor;
+		panner.rolloffFactor = soundProps.rolloffFactor || 1;
 	}
 
 })();

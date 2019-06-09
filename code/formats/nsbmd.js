@@ -70,6 +70,7 @@ window.nsbmd = function(input) {
 		head.maxStack = view.getUint8(offset+0x1A);
 
 		head.scale = view.getInt32(offset+0x1C, true)/4096;
+		head.downScale = view.getInt32(offset+0x20, true)/4096; //usually inverse of the above
 
 		head.numVerts = view.getUint16(offset+0x24, true);
 		head.numSurfaces = view.getUint16(offset+0x26, true);
@@ -93,6 +94,12 @@ window.nsbmd = function(input) {
 		var tex = nitro.read3dInfo(view, head.materialsOffset+view.getUint16(head.materialsOffset, true), texInfoHandler);
 		var palt = nitro.read3dInfo(view, head.materialsOffset+view.getUint16(head.materialsOffset+2, true), palInfoHandler);
 
+		//bind tex and palt names to their materials
+		for (var i=0; i<materials.objectData.length; i++) {
+			materials.objectData[i].texName = tex.names[materials.objectData[i].tex];
+			materials.objectData[i].palName = palt.names[materials.objectData[i].pal];
+		}
+
 		var commands = parseBones(head.bonesOffset, view, polys, materials, objects, head.maxStack);
 
 		return {head: head, objects: objects, polys: polys, materials: materials, tex:tex, palt:palt, commands:commands}
@@ -101,14 +108,18 @@ window.nsbmd = function(input) {
 	function parseBones(offset, view, polys, materials, objects, maxStack) {
 		var last;
 		var commands = [];
+		var debug = true;
+		if (debug) console.log("== Begin Parse Bones ==");
 
 		var freeStack = maxStack;
 		var forceID=null;
 		var lastMat = null;
+		var bound = [];
+
+		var matMap = [];
 
 		while (offset<texPalOff) { //bones
 			last = view.getUint8(offset++);
-			console.log("bone cmd: 0x"+last.toString(16));
 			switch (last) {
 				case 0x06: //bind object transforms to parent. bone exists but is not placed in the stack
 					var obj = view.getUint8(offset++);
@@ -117,21 +128,50 @@ window.nsbmd = function(input) {
 
 					var object = objects.objectData[obj];
 					object.parent = parent;
+					if (debug) console.log("[0x"+last.toString(16)+"] Multiply stack with object " + obj + " bound to parent " + parent);
 
 					commands.push({obj:obj, parent:parent, stackID:freeStack++});
 					break;
 				case 0x26:
 				case 0x46: //placed in the stack at stack id
+				case 0x66:
 					var obj = view.getUint8(offset++);
 					var parent = view.getUint8(offset++);
 					var zero = view.getUint8(offset++);
 					var stackID = view.getUint8(offset++);
+					var restoreID = null;
+					if (last == 0x66) restoreID = view.getUint8(offset++);
+					if (last == 0x46) {
+						restoreID = stackID;
+						stackID = freeStack++;
+					}
 
 					var object = objects.objectData[obj];
 					object.parent = parent;
 
-					commands.push({obj:obj, parent:parent, stackID:((last == 0x26)?stackID:freeStack++), restoreID:((last == 0x46)?stackID:null)});
+					if (debug) {
+						var debugMessage = "[0x"+last.toString(16)+"] ";
+						if (restoreID != null) debugMessage += "Restore matrix at " + stackID + ", ";
+						debugMessage += "Multiply stack with object " + obj + " bound to parent " + parent;
+						if (stackID != null) debugMessage += ", store in " + stackID;
+						console.log(debugMessage);
+					}
+					var item = {obj:obj, parent:parent, stackID:stackID, restoreID:restoreID};
+					if (bound[stackID]) {
+						//we're updating a matrix that is already bound...
+						//we must move copy the old value of the matrix to another place, and update the polys that point to it to the new location.
+						//(does not play well with skinned meshes (they don't do this anyways), but fixes lots of "multiple object" meshes.)
+						console.log("!! Already bound !! Moving old matrix at " + stackID + " to " + freeStack);
+						var poly = polys.objectData;
+						for (var i=0; i<poly.length; i++) {
+							if (poly[i].stackID == stackID) poly[i].stackID = freeStack;
+						}
+						commands.push({copy: stackID, dest: freeStack++})
+					}
+
+					commands.push(item);
 					break;
+					/*
 				case 0x66: //has ability to restore to another stack id. no idea how this works
 					var obj = view.getUint8(offset++);
 					var parent = view.getUint8(offset++);
@@ -142,8 +182,11 @@ window.nsbmd = function(input) {
 					var object = objects.objectData[obj];
 					object.parent = parent;
 
+					if (debug) console.log("[0x"+last.toString(16)+"] Restore matrix at " + restoreID + ", multiply stack with object " + obj + " bound to parent " + parent + ", store in " + stackID);
+
 					commands.push({obj:obj, parent:parent, stackID:stackID, restoreID:restoreID});
 					break;
+					*/
 				case 0x04:
 				case 0x24:
 				case 0x44: //bind material to polygon: matID, 5, polyID
@@ -151,54 +194,69 @@ window.nsbmd = function(input) {
 					lastMat = mat;
 					var five = view.getUint8(offset++); //???
 					var poly = view.getUint8(offset++);
-					polys.objectData[poly].stackID = (forceID == null)?(commands[commands.length-1].stackID):forceID;
+					var bindID = (forceID == null)?(commands[commands.length-1].stackID):forceID;
+					bound[bindID] = true;
+					polys.objectData[poly].stackID = bindID;
 					polys.objectData[poly].mat = mat;
+
+					if (debug) console.log("[0x"+last.toString(16)+"] Bind material " + mat + " to poly " + poly + " (with stack id " + polys.objectData[poly].stackID + ")");
 					break;
 				case 1:
+					//end of all
+					if (debug) console.log("[0x"+last.toString(16)+"] END OF BONES");
 					break;
 				case 2: //node visibility (maybe to implement this set matrix to 0)
 
 					var node = view.getUint8(offset++);
 					var vis = view.getUint8(offset++);
 					objects.objectData[node].vis = vis;
-					console.log("visibility thing "+node);
+					if (debug) console.log("[0x"+last.toString(16)+"] Set object " + node + " visibility: " + vis);
 					if (node > 10) debugger;
 					break;
 				case 3: //stack id for poly (wit)
 					forceID = view.getUint8(offset++);
-					console.log("stackid is "+forceID);
+					if (debug) console.log("[0x"+last.toString(16)+"] Force stack id to " + forceID);
 				case 0:
 					break;
-				case 5:
-					//i don't... what??
-					//holy shp!
+				case 5: //"draw a mesh" supposedly. might require getting a snapshot of the matrices at this point
 					var poly = view.getUint8(offset++);
-					polys.objectData[poly].stackID = (stackID == null)?(commands[commands.length-1].forceID):forceID;
+					var bindID = (forceID == null)?(commands[commands.length-1].stackID):forceID;
+					bound[bindID] = true;
+					polys.objectData[poly].stackID = bindID;
 					polys.objectData[poly].mat = lastMat;
-
+					if (debug) console.log("[0x"+last.toString(16)+"] Draw " + poly + "(stack id " + polys.objectData[poly].stackID + ")");
 					break;
 				case 7:
 					//sets object to be billboard
 					var obj = view.getUint8(offset++);
 					objects.objectData[obj].billboardMode = 1;
+					if (debug) console.log("[0x"+last.toString(16)+"] Object " + obj + " set to full billboard mode.");
 					mainObj.hasBillboards = true;
 					break;
 				case 8:
 					//sets object to be billboard around only y axis. (xz remain unchanged)
 					var obj = view.getUint8(offset++);
 					objects.objectData[obj].billboardMode = 2;
+					if (debug) console.log("[0x"+last.toString(16)+"] Object " + obj + " set to Y billboard mode.");
 					mainObj.hasBillboards = true;
 					break;
+				case 9: //skinning equ. not used?
+					if (debug) console.log("[0x"+last.toString(16)+"] Skinning Equation (UNIMPLEMENTED)");
+					debugger;
+					break;
 				case 0x0b:
-					break; //begin, not quite sure what of. doesn't seem to change anything
+					if (debug) console.log("[0x"+last.toString(16)+"] BEGIN PAIRING.");
+					break; //begin polygon material paring (scale up? using scale value in model..)
 				case 0x2b:
-					break; //end
+					if (debug) console.log("[0x"+last.toString(16)+"] END PAIRING.");
+					break; //end polygon material pairing (scale down? using scale(down) value in model..)
 				default:
-					console.log("bone transform unknown: "+last);
+					console.log("bone transform unknown: 0x"+last.toString(16));
 				break;
 			}
 		}
-		//if (window.throwWhatever) debugger;
+
+		if (debug) console.log("== End Parse Bones ==");
 		return commands;
 	}
 
@@ -213,7 +271,6 @@ window.nsbmd = function(input) {
 		}*/
 
 		var polyAttrib = view.getUint16(offset+12, true);
-		console.log(polyAttrib);
 
 		var flags = view.getUint16(offset+22, true); //other info in here is specular data etc.
 

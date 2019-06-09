@@ -19,6 +19,8 @@ window.ItemController = function(scene) {
 	t.changeItem = changeItem;
 	t.update = update;
 	t.draw = draw;
+	t.createItem = createItem;
+	t.removeItem = removeItem;
 
 	var RedShell, Banana, Bomb, BlueShell, Star, MultiItem, Shroom, TripleShroom, QueenShroom, Bullet, Ghost, Squid //these are all null
 
@@ -47,9 +49,24 @@ window.ItemController = function(scene) {
 	}
 
 	function draw(mvMatrix, pMatrix, gl) {
+		nitroRender.setShadBias(0.001);
 		for (var i=0; i<t.items.length; i++) {
 			var e = t.items[i];
 			t.items[i].draw(mvMatrix, pMatrix, gl);
+		}
+		nitroRender.resetShadOff();
+	}
+
+	function createItem(type, kart) {
+		var item = new Item(scene, kart, type, t.curInd++);
+		t.items.push(item);
+		return item;
+	}
+
+	function removeItem(item) {
+		var ind = t.items.indexOf(item);
+		if (ind !== -1) {
+			t.items.splice(ind, 1);
 		}
 	}
 

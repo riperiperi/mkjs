@@ -8,6 +8,7 @@
 window.ndsFS = function(input) {
 	this.load = load;
 	this.getFile = getFile;
+	this.list = list;
 
 	var arc = this;
 	var handlers = [];
@@ -63,6 +64,22 @@ window.ndsFS = function(input) {
 		}
 		console.error("Path is not a file: "+name);
 		return null; //incomplete path; we ended on a directory, not a file!
+	}
+
+	function list(files, curDir, path) {
+		path = path || "/";
+		files = files || [];
+		var table = arc.sections["BTNF"].directories;
+		curDir = curDir || table[0].entries; //root
+
+		for (var i=0; i<curDir.length; i++) {
+			if (curDir[i].dir) {
+				list(files, table[curDir[i].id-0xF000].entries, path+curDir[i].name+"/");
+			} else {
+				files.push(path + curDir[i].name);
+			}
+		}
+		return files;
 	}
 
 	function readFileWithID(id) {

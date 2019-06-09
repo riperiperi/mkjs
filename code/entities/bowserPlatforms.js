@@ -1,7 +1,7 @@
 //
 // bowserPlatforms.js
 //--------------------
-// Provides platforms for Bowser's Castle
+// Provides moving platforms for Bowser's Castle and Delfino
 // by RHY3756547
 //
 // includes:
@@ -78,6 +78,133 @@ window.ObjRotaryRoom = function(obji, scene) {
 
 }
 
+window.ObjBridge = function(obji, scene) {
+	var obji = obji;
+	var res = [];
+
+	var t = this;
+
+	t.collidable = true;
+	t.colMode = 0;
+	t.colRad = 512;
+	t.getCollision = getCollision;
+	t.moveWith = moveWith;
+
+	t.pos = vec3.clone(obji.pos);
+	t.angle = vec3.clone(obji.angle);
+	t.scale = vec3.clone(obji.scale);
+
+	t.requireRes = requireRes;
+	t.provideRes = provideRes;
+	t.update = update;
+	t.draw = draw;
+
+	t.largerUpAngle = obji.setting1&0xFFFF;
+	t.upDuration = obji.setting1>>16;
+	t.statDuration = obji.setting2&0xFFFF;
+	t.downDuration = obji.setting2>>16;
+	t.upAngle = obji.setting3&0xFFFF;
+	t.unknown = obji.setting4>>16; //10001
+
+	t.obji = obji;
+	t.colFrame = 0;
+
+	var dirVel = 0;
+	var genCol;
+
+	var prevMat;
+	var curMat;
+	var colMat = mat4.create();
+	prevMat = curMat;
+
+	var anim;
+	var animMat;
+
+	var frame = 0;
+	var mode = 0; //going up, stationary, going down, stationary
+
+	function setMat() {
+		prevMat = curMat;
+		var mat = mat4.create();
+		mat4.translate(mat, mat, t.pos);
+
+		if (t.angle[2] != 0) mat4.rotateZ(mat, mat, t.angle[2]*(Math.PI/180));
+		if (t.angle[1] != 0) mat4.rotateY(mat, mat, t.angle[1]*(Math.PI/180));
+		if (t.angle[0] != 0) mat4.rotateX(mat, mat, t.angle[0]*(Math.PI/180));
+		
+		mat4.scale(mat, mat, vec3.scale([], t.scale, 16));
+		mat4.scale(colMat, mat, [genCol.scale, genCol.scale, genCol.scale]);
+		t.colFrame++;
+		curMat = mat;
+	}
+
+	function update(scene) {
+		var angle = 0;
+		frame++;
+		switch (mode) {
+			case 0:
+				var p = frame / t.upDuration;
+				angle = (0.5 - Math.cos(p * Math.PI) / 2) * t.largerUpAngle;
+				if (frame >= t.upDuration) {
+					mode = 1;
+					frame = 0;
+				}
+				break;
+			case 1:
+			case 3:
+				angle = (mode == 1) ? t.largerUpAngle : 0;
+				if (frame >= t.statDuration) {
+					mode = (mode + 1) % 4;
+					frame = 0;
+				}
+				break;
+			case 2:
+				var p = 1 - frame / t.downDuration;
+				angle = (0.5 - Math.cos(p * Math.PI) / 2) * t.largerUpAngle;
+				if (frame >= t.downDuration) {
+					mode = 3;
+					frame = 0;
+				}
+				break;
+		}
+
+		t.angle[0] = -angle;
+		animMat = anim.setFrame(0, 0, angle*1.5);
+		setMat();
+	}
+
+	function draw(view, pMatrix) {
+		var mat = mat4.create();
+		mat4.mul(mat, view, curMat);
+
+		res.mdl[0].draw(mat, pMatrix, animMat);
+	}
+
+	function requireRes() { //scene asks what resources to load
+		return {mdl:[{nsbmd:"bridge.nsbmd"}], other:[null, "bridge.nsbca"]};
+	}
+
+	function provideRes(r) {
+		res = r; //...and gives them to us. :)
+		var inf = res.mdl[0].getCollisionModel(0, 1, 7<<8); //dash
+		var inf2 = res.mdl[0].getCollisionModel(0, 0, 0); //regular
+		anim = new nitroAnimator(r.mdl[0].bmd, r.other[1]);
+
+		genCol = {dat:JSON.parse(JSON.stringify(inf.dat.concat(inf2.dat))), scale:inf.scale};
+	}
+
+	function getCollision() {
+		return { tris: genCol.dat, mat: colMat, frame: t.colFrame };
+	}
+
+	function moveWith(obj) { //used for collidable objects that move. 
+		//the most general way to move something with an object is to multiply its position by the inverse mv matrix of that object, and then the new mv matrix.
+		vec3.transformMat4(obj.pos, obj.pos, mat4.invert([], prevMat))
+		vec3.transformMat4(obj.pos, obj.pos, curMat)
+	}
+
+}
+
 window.ObjRoutePlatform = function(obji, scene) {
 	var obji = obji;
 	var res = [];
@@ -111,12 +238,14 @@ window.ObjRoutePlatform = function(obji, scene) {
 	t.elapsedTime = 0;
 
 	t.mode = 0;
+	t.colFrame = 0;
 
 	var movVel;
 
 	//t.speed = (obji.setting1&0xFFFF)/8192;
 
 	function update(scene) {
+		t.colFrame++;
 		if (t.mode == 0) {
 			t.elapsedTime += t.routeSpeed;
 			movVel = vec3.sub([], t.nextNode.pos, t.prevPos);
@@ -159,15 +288,11 @@ window.ObjRoutePlatform = function(obji, scene) {
 	function generateCol() {
 		genCol = {dat: [
 			{
-				Vertex1: [25, 0, 11],
-				Vertex2: [25, 0, -11],
-				Vertex3: [-25, 0, -11],
+				Vertices: [[25, 0, 11], [25, 0, -11], [-25, 0, -11]],
 				Normal: [0, 1, 0]
 			},
 			{
-				Vertex1: [-25, 0, -11],
-				Vertex2: [-25, 0, 11],
-				Vertex3: [25, 0, 11],
+				Vertices: [[-25, 0, -11], [-25, 0, 11], [25, 0, 11]],
 				Normal: [0, 1, 0]
 			},
 		], scale: 1};
@@ -182,6 +307,7 @@ window.ObjRoutePlatform = function(obji, scene) {
 		mat4.scale(mat, mat, vec3.mul([], [16*inf.scale, 16*inf.scale, 16*inf.scale], t.scale));
 
 		obj.mat = mat;
+		obj.frame = t.colFrame;
 		return obj;
 	}
 

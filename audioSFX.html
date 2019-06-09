@@ -26,7 +26,7 @@
 			play.addEventListener('click', function() {
 				if (last != null) nitroAudio.instaKill(last);
 				document.getElementById('seq').innerText = "Current SSEQ: "+i;
-				last = nitroAudio.playSound(i++, {}, 2);
+				last = nitroAudio.playSound(i++, {}, 0);
 			})
 			/*
 			var ctx = new AudioContext();

@@ -5,6 +5,137 @@
 // by RHY3756547
 //
 
+window.GraphicTester = function(rom) {
+
+	findGraphicsRecursive(rom);
+	function listRecursive(resource, path) {
+		path = path || "";
+		var files = resource.list();
+		for (var i=0; i<files.length; i++) {
+			var file = files[i];
+			console.log(path + file);
+			if (file.toLowerCase().endsWith(".carc")) {
+				listRecursive(new narc(lz77.decompress(resource.getFile(file))), path + file);
+			}
+			if (file.toLowerCase().endsWith(".nftr")) {
+				testFont(new nftr(resource.getFile(file)), 0, path + file);
+			}
+		}
+	}
+
+	function findGraphicsRecursive(resource, path) {
+		path = path || "";
+		var files = resource.list();
+		var pals = files.filter(x => x.toLowerCase().endsWith(".nclr"));
+		var graphics = files.filter(x => x.toLowerCase().endsWith(".ncgr"));
+		for (var i=0; i<files.length; i++) {
+			var file = files[i];
+			console.log(path + file);
+			if (file.toLowerCase().endsWith(".carc")) {
+				if (/\_..\./.exec(file) != null) continue; //a localization carc (format _us.carc). only scan the main ones. (+us)
+				var mainCarc = new narc(lz77.decompress(resource.getFile(file)));
+				var locCarc = resource.getFile(file.replace(".carc", "_us.carc"));
+				if (locCarc != null) {
+					//create a combo
+					mainCarc = new narcGroup([mainCarc, new narc(lz77.decompress(locCarc))]);
+				}
+				findGraphicsRecursive(mainCarc, path + file);
+			}
+			if (file.toLowerCase().endsWith(".nscr")) {
+				//screen
+				//try to find a pal
+				//...not a friend, like a color palette
+				var palFile = mostSimilarString(file, pals, "b");
+				var grFile = mostSimilarString(file, graphics.filter(x => !x.endsWith(".nce.ncgr")), "b");
+				if (palFile != null && grFile != null) {
+					var scr = new nscr(resource.getFile(file));
+					var pal = new nclr(resource.getFile(palFile));
+					var graphic = new ncgr(resource.getFile(grFile));
+
+					var flattener = new TileFlattener(pal, graphic, scr);
+
+					var render = flattener.toCanvas(true, 0, 0);
+
+					var split = document.createElement("h3");
+					split.innerText = path + file;
+					document.body.appendChild(split);
+					split = document.createElement("h4");
+					split.innerText = path + palFile + " " + path + grFile;
+					document.body.appendChild(split);
+
+					document.body.appendChild(render);
+				}
+			}
+
+			if (file.toLowerCase().endsWith(".ncer")) {
+				//cell resource
+				//try to find a pal
+				//...not a friend, like a color palette
+				var palFile = mostSimilarString(file, pals, "o");
+				var grFile = mostSimilarString(file, graphics, "o");
+				if (palFile != null && grFile != null) {
+					var cer = new ncer(resource.getFile(file));
+					var pal = new nclr(resource.getFile(palFile));
+					var graphic = new ncgr(resource.getFile(grFile));
+
+					var flattener = new TileFlattener(pal, graphic, cer);
+
+					var split = document.createElement("h3");
+					split.innerText = path + file;
+					document.body.appendChild(split);
+					split = document.createElement("h4");
+					split.innerText = path + palFile + " " + path + grFile;
+					document.body.appendChild(split);
+
+					//render all images
+					var imageCount = cer.cebk.imageCount;
+					for (var j=0; j<imageCount; j++) {
+						var render = flattener.toCanvas(true, j, 0);
+						document.body.appendChild(render);
+					}
+				}
+			}
+		}
+	}
+
+	function mostSimilarString(text, list, pref) {
+		var bestString = null;
+		var bestScore = 0;
+		for (var i=0; i<list.length; i++) {
+			var score = startSimilarity(text, list[i], pref);
+			if (score > bestScore) {
+				bestScore = score;
+				bestString = list[i];
+			}
+		}
+		return bestString;
+	}
+
+	function countStr(text, char) {
+		var count = 0;
+		for (var i=0; i<text.length; i++) {
+			if (text[i] == char) count++;
+		}
+		return count;
+	}
+
+	function startSimilarity(text1, text2, pref) {
+		var min = Math.min(text1.length, text2.length);
+		var score = 0;
+		for (var i=0; i<min; i++) {
+			if (text1[i] != text2[i]) {
+				if (pref != null) {
+					score += countStr(text2.substr(i), pref) / 10;
+				}
+				return score;
+			}
+			score++;
+		}
+		return score; //as similar as possible
+	}
+
+}
+
 window.IngameRes = function(rom) {
 	var r = this;
 	this.kartPhys = new kartphysicalparam(rom.getFile("/data/KartModelMenu/kartphysicalparam.bin"));
@@ -21,6 +152,56 @@ window.IngameRes = function(rom) {
 	this.RaceEffect = new spa(r.MainEffect.getFile("RaceEffect.spa"));
 
 	this.MainFont = new nftr(r.Main2D.getFile("marioFont.NFTR"));
+	this.MFont = new nftr(r.Main2D.getFile("LC_Font_m.NFTR"));
+	this.SFont = new nftr(r.Main2D.getFile("LC_Font_s.NFTR"));
+
+	//testFont(this.MainFont, 0);
+	//testFont(this.MFont, 16*4);
+	//testFont(this.SFont, 32*4);
+
+	/*
+	var test = new GraphicTester(rom);
+	listRecursive(rom);
+	*/
+
+
+	function testFont(font, off, name) {
+		var all = Object.keys(font.charMap).join("");
+		var split = document.createElement("h3");
+		split.innerText = name;
+		document.body.appendChild(split);
+
+		for (var i=0; i<4; i++) {
+			var sliceF = Math.floor((all.length * i) / 4);
+			var sliceT = Math.floor((all.length * (i+1)) / 4);
+
+			var canvas = font.drawToCanvas(all.substring(sliceF, sliceT), [[0, 0, 0, 0], [255, 0, 0, 255], [255, 255, 255, 255],
+			 [32, 0, 0, 255], [64, 0, 0, 255], [96, 0, 0, 255], [128, 0, 0, 255]]);
+			document.body.appendChild(canvas);
+			//canvas.style.position = "absolute";
+			//canvas.style.left = 0;
+			//canvas.style.top = off + "px";
+
+			//off += 16;
+		}
+	}
+
+	function listRecursive(resource, path) {
+		path = path || "";
+		var files = resource.list();
+		for (var i=0; i<files.length; i++) {
+			var file = files[i];
+			console.log(path + file);
+			if (file.toLowerCase().endsWith(".carc")) {
+				listRecursive(new narc(lz77.decompress(resource.getFile(file))), path + file);
+			}
+			if (file.toLowerCase().endsWith(".nftr")) {
+				if (file == "/selectFont.NFTR") debugger;
+				testFont(new nftr(resource.getFile(file)), 0, path + file);
+			}
+		}
+	}
+
 	//debugger;
 
 	this.getChar = getChar;

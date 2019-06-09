@@ -66,6 +66,7 @@ window.nitro = new function() {
 			for (var j=0; j<16; j++) {
 				name += readChar(view, offset++)
 			}
+			objectData[i].name = name;
 			names.push(name);
 		}
 
