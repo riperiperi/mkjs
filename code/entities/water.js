@@ -27,6 +27,7 @@ window.ObjWater = function(obji, scene) {
 	var wosc = 12.288;
 	var wstay = 5*60;
 	var wchange = 4*60;
+	var useAlpha = true; //probably a crutch - this should be defined in the water material (though it might be in nsbma)
 
 	function draw(view, pMatrix) {
 		if (nitroRender.flagShadow) return;
@@ -41,7 +42,7 @@ window.ObjWater = function(obji, scene) {
 		var height = (t.pos[1])+wheight+Math.sin(frame/150)*wosc //0.106
 
 		mat4.translate(waterM, view, [Math.sin(frame/180)*96, height, Math.cos(frame/146)*96])
-		nitroRender.setColMult([1, 1, 1, 0x0A/31]);
+		if (useAlpha) nitroRender.setColMult([1, 1, 1, 0x0A/31]);
 		res.mdl[0].drawPoly(mat4.scale([], waterM, [16, 16, 16]), pMatrix, 0, 0); //water
 
 		gl.stencilFunc(gl.EQUAL, 0, 0xFF);
@@ -49,7 +50,7 @@ window.ObjWater = function(obji, scene) {
 
 		if (obji.ID != 9) {
 			mat4.translate(waterM, view, [0, height, 0])
-			nitroRender.setColMult([1, 1, 1, 0x10/31]);
+			if (useAlpha) nitroRender.setColMult([1, 1, 1, 0x10/31]);
 			res.mdl[0].drawPoly(mat4.scale([], waterM, [16, 16, 16]), pMatrix, 0, 1); //white shore wash part, water is stencil masked out
 		}
 
@@ -57,7 +58,7 @@ window.ObjWater = function(obji, scene) {
 
 		if (res.mdl[1] != null) {
 			mat4.translate(waterM, view, [-Math.sin((frame+30)/180)*96, height, Math.cos((frame+100)/146)*96])
-			nitroRender.setColMult([1, 1, 1, 0x04/31]);
+			if (useAlpha) nitroRender.setColMult([1, 1, 1, 0x04/31]);
 			res.mdl[1].draw(mat4.scale([], waterM, [16, 16, 16]), pMatrix); //water white detail part. stencil should do nothing here, since it's in the same position as the above.
 		}
 
@@ -74,10 +75,13 @@ window.ObjWater = function(obji, scene) {
 			case 0x0001:
 				return {mdl:[{nsbmd:"beach_waterC.nsbmd"}, {nsbmd:"beach_waterA.nsbmd"}]};
 			case 0x0003:
+				useAlpha = false;
 				return {mdl:[{nsbmd:"town_waterC.nsbmd"}, {nsbmd:"town_waterA.nsbmd"}]};
 			case 0x0006:
+				useAlpha = false;
 				return {mdl:[{nsbmd:"yoshi_waterC.nsbmd"}]};
 			case 0x0009:
+				useAlpha = false;
 				return {mdl:[{nsbmd:"hyudoro_waterC.nsbmd"}, {nsbmd:"hyudoro_waterA.nsbmd"}]};
 			case 0x000C:
 				wheight = 38;

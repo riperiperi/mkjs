@@ -12,8 +12,8 @@
 // render/*
 //
 
-window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes) {
-
+window.courseScene = function(mainNarc, texNarc, courseObj, chars, options, gameRes) {
+	var music = courseObj.music;
 	var startSetups = [
 		{maxplayers:12, toAline:4, xspacing:32, yspacing:32, liney:160},
 		{maxplayers:24, toAline:4, xspacing:32, yspacing:32, liney:80},
@@ -112,12 +112,18 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 		if (!shadow) {
 			var skyMat = mat4.scale(mat4.create(), mvMatrix, [1/64, 1/64, 1/64]);
 			sky.setFrame(frame);
+			if (!courseObj.skyboxShadows) nitroRender.setLightIntensities(0, 0);
 			sky.draw(skyMat, pMatrix);
+			if (!courseObj.skyboxShadows) nitroRender.setLightIntensities();
 		}
 
 		var lvlMat = mat4.scale(mat4.create(), mvMatrix, [1/64, 1/64, 1/64]);//[2, 2, 2]);
 		course.setFrame(frame);
-		course.draw(lvlMat, pMatrix);	
+		nitroRender.forceFlatNormals = true;
+		nitroRender.setLightIntensities(0);
+		course.draw(lvlMat, pMatrix);
+		nitroRender.setLightIntensities();
+		nitroRender.forceFlatNormals = false;
 
 		var transE = [];
 
@@ -139,13 +145,14 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 			else e.draw(mvMatrix, pMatrix, gl);
 		}
 
+		nitroRender.setLightIntensities(0);
 		for (var i=0; i<scn.particles.length; i++) {
 			var e = scn.particles[i];
 			e.draw(mvMatrix, pMatrix, gl);
 		}
 
 		scn.items.draw(mvMatrix, pMatrix, gl);
-
+		nitroRender.setLightIntensities();
 	}
 
 	function sndUpdate(view) {
@@ -249,8 +256,11 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 	function startCourse() {
 		scn.lightMat = mat4.create();
 		
-		mat4.rotateX(scn.lightMat, scn.lightMat, Math.PI*(61/180));
-		mat4.rotateY(scn.lightMat, scn.lightMat, Math.PI*(21/180));
+		mat4.rotateX(scn.lightMat, scn.lightMat, Math.PI*(courseObj.lightHeight || (61/180)));
+		mat4.rotateY(scn.lightMat, scn.lightMat, Math.PI*(courseObj.lightAngle || (21/180)));
+		scn.lightDir = [0, 0, 1];
+		vec3.transformMat3(scn.lightDir, scn.lightDir, mat3.invert([], mat3.fromMat4([], scn.lightMat)));
+		
 		scn.farShadMat = mat4.create();
 		mat4.translate(scn.farShadMat, scn.lightMat, getLightCenter());
 
@@ -408,7 +418,7 @@ window.courseScene = function(mainNarc, texNarc, music, chars, options, gameRes)
 			switch (mode.id) {
 				case 0: 
 					//race init. fade scene in and play init music.
-					nitroAudio.playSound(11, {volume:2}, null); //7:race (gp), 11:race2 (vs), 12:battle
+					nitroAudio.playSound((courseObj.battle)?12:11, {volume:2}, null); //7:race (gp), 11:race2 (vs), 12:battle
 					break;
 				case 1:
 					//spawn lakitu and countdown animation. allow pre-acceleration.

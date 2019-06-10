@@ -88,11 +88,11 @@ window.clientScene = function(wsUrl, wsInstance, res) {
 			var mainNarc, texNarc
 			if (obj.c.substr(0, 5) == "mkds/") {
 				var cnum = Number(obj.c.substr(5));
-				var music = MKDSCONST.COURSE_MUSIC[cnum];
-				var cDir = MKDSCONST.COURSEDIR+MKDSCONST.COURSES[cnum];
+				var course = MKDSCONST.COURSE[cnum];
+				var cDir = MKDSCONST.COURSEDIR+course.name;
 				var mainNarc = new narc(lz77.decompress(gameROM.getFile(cDir+".carc")));
 				var texNarc = new narc(lz77.decompress(gameROM.getFile(cDir+"Tex.carc")));
-				setUpCourse(mainNarc, texNarc, music, obj)
+				setUpCourse(mainNarc, texNarc, course, obj)
 			}
 			else throw "custom tracks are not implemented yet!"
 		}
@@ -124,7 +124,7 @@ window.clientScene = function(wsUrl, wsInstance, res) {
 		}
 	}
 
-	function setUpCourse(mainNarc, texNarc, music, obj) {
+	function setUpCourse(mainNarc, texNarc, course, obj) {
 		var chars = [];
 		for (var i=0; i<obj.k.length; i++) {
 			var k = obj.k[i];
@@ -142,7 +142,7 @@ window.clientScene = function(wsUrl, wsInstance, res) {
 			}
 		}
 
-		t.activeScene = new courseScene(mainNarc, texNarc, music, chars, {}, res);
+		t.activeScene = new courseScene(mainNarc, texNarc, course, chars, {}, res);
 
 		for (var i=0; i<obj.k.length; i++) {
 			t.activeScene.karts[i].active = obj.k[i].active;

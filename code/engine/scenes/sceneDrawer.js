@@ -84,7 +84,7 @@ window.sceneDrawer = new function() {
 		gl.colorMask(false, false, false, false);
 		scn.draw(gl, shadMat, true);
 
-		nitroRender.setShadowMode(shadowTarg.depth, scn.farShad.depth, shadMat, scn.farShadMat);
+		nitroRender.setShadowMode(shadowTarg.depth, scn.farShad.depth, shadMat, scn.farShadMat, scn.lightDir);
 		nitroRender.flagShadow = false;
 
 		nitroRender.updateBillboards(view.mv);

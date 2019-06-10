@@ -31,6 +31,7 @@ window.ObjDecor = function(obji, scene) {
 	var animMat = null;
 
 	function draw(view, pMatrix) {
+		if (forceBill) nitroRender.setShadBias(0.001);
 		mat4.translate(mat, view, t.pos);
 				
 		if (t.angle[2] != 0) mat4.rotateZ(mat, mat, t.angle[2]*(Math.PI/180));
@@ -39,6 +40,7 @@ window.ObjDecor = function(obji, scene) {
 		
 		mat4.scale(mat, mat, vec3.scale([], t.scale, 16));
 		res.mdl[0].draw(mat, pMatrix, animMat);
+		if (forceBill) nitroRender.resetShadOff();
 	}
 
 	function update() {

@@ -199,6 +199,7 @@ window.NitroParticle = function(scene, emitter, pos, vel, dir, dirVel, duration,
             nitroRender.last.obj = obj;
         }
 
+        gl.disable(gl.CULL_FACE);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
         nitroRender.setColMult([1, 1, 1, 1]);

@@ -14,8 +14,9 @@
 window.nitroRender = new function() {
 	var gl, frag, vert, nitroShader;
 	var cVec, color, texCoord, norm;
-	var vecMode, vecPos, vecNorm, vecTx, vecCol, vecNum, vecMat, curMat;
+	var vecMode, vecPos, vecNorm, vecTx, vecCol, vecNum, vecMat, curMat, stripAlt;
 	var texWidth, texHeight, alphaMul = 1;
+	var t = this;
 
 	this.cullModes = [];
 
@@ -35,6 +36,7 @@ window.nitroRender = new function() {
 	this.getViewHeight = getViewHeight;
 
 	this.flagShadow = false;
+	this.forceFlatNormals = false; //generate flat normals for this mesh. Used for course model for better shadows.
 
 	var parameters = {
 		0: 0, 
@@ -127,6 +129,7 @@ window.nitroRender = new function() {
 			vecMat = [];
 		}
 		vecNum = 0;
+		stripAlt = 0;
 	}
 
 	instructions[0x41] = function(view, off) { //end vtx
@@ -154,6 +157,24 @@ window.nitroRender = new function() {
 		var norm = gl.createBuffer();
 
 		var posArray = new Float32Array(vecPos);
+		if (t.forceFlatNormals && modes[vecMode] == gl.TRIANGLES) {
+			//calculate new flat normals for each triangle
+			for (var i=0; i<vecPos.length; i+=9) {
+				var v1 = [vecPos[i], vecPos[i+1], vecPos[i+2]];
+				var v2 = [vecPos[i+3], vecPos[i+4], vecPos[i+5]];
+				var v3 = [vecPos[i+6], vecPos[i+7], vecPos[i+8]];
+
+				vec3.sub(v2, v2, v1);
+				vec3.sub(v3, v3, v1);
+				var newNorm = vec3.cross([], v2, v3);
+				vec3.normalize(newNorm, newNorm);
+				for (var j=0; j<3; j++) {
+					for (var k=0; k<3; k++) {
+						vecNorm[i+(j*3)+k] = newNorm[k];
+					}
+				}
+			}
+		}
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, pos);
 		gl.bufferData(gl.ARRAY_BUFFER, posArray, gl.STATIC_DRAW);
@@ -192,11 +213,14 @@ window.nitroRender = new function() {
 		}
 
 		if (optimiseTriangles && (vecMode > 1) && (vecNum > 2)) { //convert tri strips to individual triangles so we get one buffer per polygon
-			vecPos = vecPos.concat(vecPos.slice(vecPos.length-6));
-			vecNorm = vecNorm.concat(vecNorm.slice(vecNorm.length-6));
-			vecTx = vecTx.concat(vecTx.slice(vecTx.length-4));
-			vecCol = vecCol.concat(vecCol.slice(vecCol.length-8));
-			vecMat = vecMat.concat(vecMat.slice(vecMat.length-2));
+			var b = vecMat.length - (((stripAlt % 2) == 0)?1:3);
+			var s2 = vecMat.length - (((stripAlt % 2) == 0)?2:1);
+			vecPos = vecPos.concat(vecPos.slice(b*3, b*3+3)).concat(vecPos.slice(s2*3, s2*3+3));
+			vecNorm = vecNorm.concat(vecNorm.slice(b*3, b*3+3)).concat(vecNorm.slice(s2*3, s2*3+3));
+			vecTx = vecTx.concat(vecTx.slice(b*2, b*2+2)).concat(vecTx.slice(s2*2, s2*2+2));
+			vecCol = vecCol.concat(vecCol.slice(b*4, b*4+4)).concat(vecCol.slice(s2*4, s2*4+4));
+			vecMat = vecMat.concat(vecMat.slice(b, b+1)).concat(vecMat.slice(s2, s2+1));
+			stripAlt++;
 		}
 
 		vecNum++;
@@ -206,7 +230,6 @@ window.nitroRender = new function() {
 		vecCol = vecCol.concat(color);
 		vecNorm = vecNorm.concat(norm);
 		vecMat.push(curMat);
-
 	}
 
 	function tenBitSign(val) {
@@ -241,16 +264,19 @@ window.nitroRender = new function() {
         gl.uniform1i(this.nitroShader.samplerUniform, 0);
 	}
 
-	this.setShadowMode = function(sTex, fsTex, sMat, fsMat) {
+	this.setShadowMode = function(sTex, fsTex, sMat, fsMat, dir) {
 		this.nitroShader = shaders[1];
 		var shader = shaders[1];
 		gl.useProgram(shader);
 
+		vec3.normalize(dir, dir);
+		gl.uniform3fv(shader.lightDirUniform, dir);
 		gl.uniformMatrix4fv(shader.shadowMatUniform, false, sMat);
 		gl.uniformMatrix4fv(shader.farShadowMatUniform, false, fsMat);
 		gl.uniform1f(shader.lightIntensityUniform, 0.3);
 
 		this.resetShadOff();
+		this.setNormalFlip(1);
 		gl.activeTexture(gl.TEXTURE1);
 		gl.bindTexture(gl.TEXTURE_2D, sTex);
 		gl.uniform1i(shader.lightSamplerUniform, 1);
@@ -263,16 +289,33 @@ window.nitroRender = new function() {
 		this.prepareShader();
 	}
 
+	this.setLightIntensities = function(intensity, shadIntensity) {
+		if (intensity == null) intensity = 0.3;
+		if (shadIntensity == null) shadIntensity = 1;
+		var shader = this.nitroShader;
+		gl.useProgram(this.nitroShader);
+		gl.uniform1f(shader.lightIntensityUniform, intensity);
+		gl.uniform1f(shader.shadLightenUniform, 1-shadIntensity);
+	}
+
 	this.setShadBias = function(bias) {
-		var shader = shaders[1];
+		var shader = this.nitroShader;
+		gl.useProgram(this.nitroShader);
 		gl.uniform1f(shader.shadOffUniform, bias);
 		gl.uniform1f(shader.farShadOffUniform, bias);
 	}
 
+	this.setNormalFlip = function(flip) {
+		var shader = this.nitroShader;
+		gl.useProgram(this.nitroShader);
+		gl.uniform1f(shader.normalFlipUniform, flip);
+	}
+
 	this.resetShadOff = function() {
-		var shader = shaders[1];
-		gl.uniform1f(shader.shadOffUniform, 0.00005+((mobile)?0.0005:0));
-		gl.uniform1f(shader.farShadOffUniform, 0.0005);
+		var shader = this.nitroShader;
+		gl.useProgram(this.nitroShader);
+		gl.uniform1f(shader.shadOffUniform, 0.0005+((mobile)?0.0005:0));
+		gl.uniform1f(shader.farShadOffUniform, 0.0020);
 	}
 
 	this.unsetShadowMode = function() {
@@ -352,6 +395,7 @@ window.nitroRender = new function() {
 
 		vecMode = 0;
 		vecNum = 0;
+		stripAlt = 0;
 		vecPos = []; 
 		vecNorm = [];
 		vecTx = []; 
@@ -782,10 +826,10 @@ function nitroModel(bmd, btx) {
 			}
 		}
 
-        if (nitroRender.last.tex != tex[pmat]) {
-        	gl.bindTexture(gl.TEXTURE_2D, tex[pmat]); //load up material texture
-        	nitroRender.last.tex = tex[pmat];
-        }
+		if (nitroRender.last.tex != tex[pmat]) {
+			gl.bindTexture(gl.TEXTURE_2D, tex[pmat]); //load up material texture
+			nitroRender.last.tex = tex[pmat];
+		}
 
 		var material = model.materials.objectData[pmat];
 		nitroRender.setAlpha(material.alpha);
@@ -807,8 +851,26 @@ function nitroModel(bmd, btx) {
 
 		} else gl.uniformMatrix3fv(shader.texMatrixUniform, false, material.texMat);	
 
-        if (modelBuffers[modelind][polyind] == null) modelBuffers[modelind][polyind] = nitroRender.renderDispList(poly.disp, tex[poly.mat], (poly.stackID == null)?model.lastStackID:poly.stackID);
-        drawModelBuffer(modelBuffers[modelind][polyind], gl, shader);
+		if (modelBuffers[modelind][polyind] == null) modelBuffers[modelind][polyind] = nitroRender.renderDispList(poly.disp, tex[poly.mat], (poly.stackID == null)?model.lastStackID:poly.stackID);
+		
+		if (material.cullMode < 3) {
+			gl.enable(gl.CULL_FACE);
+			gl.cullFace(nitroRender.cullModes[material.cullMode]);
+		} else {
+			if (nitroRender.forceFlatNormals) {
+				//dual side lighting model, course render mode essentially
+				gl.enable(gl.CULL_FACE);
+				gl.cullFace(gl.BACK);
+				drawModelBuffer(modelBuffers[modelind][polyind], gl, shader);
+				nitroRender.setNormalFlip(-1);
+				gl.cullFace(gl.FRONT);
+				drawModelBuffer(modelBuffers[modelind][polyind], gl, shader);
+				nitroRender.setNormalFlip(1);
+				return;
+			}
+			gl.disable(gl.CULL_FACE);
+		}
+		drawModelBuffer(modelBuffers[modelind][polyind], gl, shader);
 	}
 
 	function frameLerp(frame, step, values) {

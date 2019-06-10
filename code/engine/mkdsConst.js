@@ -14,53 +14,53 @@ window.MKDSCONST = new (function() {
 	this.COURSEDIR = "/data/Course/";
 
 	this.COURSES = [ //in order of course id, nitro through retro
-		"cross_course",
-		"bank_course",
-		"beach_course",
-		"mansion_course",
+		{name:"cross_course", music: 74},
+		{name:"bank_course", music: 16},
+		{name:"beach_course", music: 15},
+		{name:"mansion_course", music: 21, lightHeight: 20/180, lightAngle: 160/180},
 
-		"desert_course",
-		"town_course",
-		"pinball_course",
-		"ridge_course",
+		{name:"desert_course", music: 38, lightHeight: 40/180},
+		{name:"town_course", music: 17},
+		{name:"pinball_course", music: 19},
+		{name:"ridge_course", music: 36},
 
-		"snow_course",
-		"clock_course",
-		"mario_course",
-		"airship_course",
+		{name:"snow_course", music: 37},
+		{name:"clock_course", music: 39},
+		{name:"mario_course", music: 74},
+		{name:"airship_course", music: 18, lightHeight: 40/180, lightAngle: 140/180},
 
-		"stadium_course",
-		"garden_course",
-		"koopa_course",
-		"rainbow_course",
+		{name:"stadium_course", music: 19},
+		{name:"garden_course", music: 20},
+		{name:"koopa_course", music: 40},
+		{name:"rainbow_course", music: 41},
 
 
-		"old_mario_sfc",
-		"old_momo_64",
-		"old_peach_agb",
-		"old_luigi_gc",
+		{name:"old_mario_sfc", music: 22},
+		{name:"old_momo_64", music: 30},
+		{name:"old_peach_agb", music: 26},
+		{name:"old_luigi_gc", music: 33},
 
-		"old_donut_sfc",
-		"old_frappe_64",
-		"old_koopa_agb",
-		"old_baby_gc",
+		{name:"old_donut_sfc", music: 24},
+		{name:"old_frappe_64", music: 31},
+		{name:"old_koopa_agb", music: 27},
+		{name:"old_baby_gc", music: 34},
 
-		"old_noko_sfc",
-		"old_choco_64",
-		"old_luigi_agb",
-		"old_kinoko_gc",
+		{name:"old_noko_sfc", music: 23},
+		{name:"old_choco_64", music: 29},
+		{name:"old_luigi_agb", music: 26},
+		{name:"old_kinoko_gc", music: 35},
 
-		"old_choco_sfc",
-		"old_hyudoro_64",
-		"old_sky_agb",
-		"old_yoshi_gc",
+		{name:"old_choco_sfc", music: 25},
+		{name:"old_hyudoro_64", music: 32},
+		{name:"old_sky_agb", music: 28, skyboxShadows: true},
+		{name:"old_yoshi_gc", music: 33, lightHeight: 30/180, lightAngle: 111/180},
 
-		"mini_stage1",
-		"mini_stage2",
-		"mini_stage3",
-		"mini_stage4",
-		"mini_block_64",
-		"mini_dokan_gc"
+		{name:"mini_stage1", music: 43, battle: true},
+		{name:"mini_stage2", music: 43, battle: true, lightHeight: 20/180, lightAngle: 160/180},
+		{name:"mini_stage3", music: 43, battle: true},
+		{name:"mini_stage4", music: 43, battle: true},
+		{name:"mini_block_64", music: 43, battle: true},
+		{name:"mini_dokan_gc", music: 43, battle: true}
 
 	]
 

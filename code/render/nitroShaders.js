@@ -84,13 +84,16 @@ window.nitroShaders = new (function() {
 	varying vec4 color;\n\
 	varying vec4 lightDist;\n\
 	varying vec4 fLightDist;\n\
+	varying vec3 normal;\n\
 	\n\
 	uniform float shadOff; \n\
 	uniform float farShadOff; \n\
 	uniform sampler2D lightDSampler;\n\
 	uniform sampler2D farLightDSampler;\n\
+	uniform float shadLighten; \n\
 	\n\
 	uniform sampler2D uSampler;\n\
+	uniform vec3 lightDir;\n\
 	\n\
 	float shadowCompare(sampler2D map, vec2 pos, float compare, float so) {\n\
 		float depth = texture2D(map, pos).r;\n\
@@ -118,17 +121,20 @@ window.nitroShaders = new (function() {
 		\n\
 		vec2 ldNorm = abs((lightDist.xy)-vec2(0.5, 0.5));\n\
 		float dist = max(ldNorm.x, ldNorm.y);\n\
+		float shadIntensity;\n\
 		\n\
 		if (dist > 0.5) {\n\
-			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff, farShadOff*2.0));\n\
+			shadIntensity = shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff, farShadOff*0.5);\n\
 		} else if (dist > 0.4) {\n\
-			float lerp1 = shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff, farShadOff*2.0);\n\
-			float lerp2 = shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff, shadOff*4.0);\n\
+			float lerp1 = shadowLerp(farLightDSampler, vec2(4096.0, 4096.0), fLightDist.xy, fLightDist.z-farShadOff, farShadOff*0.5);\n\
+			float lerp2 = shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff, shadOff*0.5);\n\
 			\n\
-			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), mix(lerp2, lerp1, (dist-0.4)*10.0));\n\
+			shadIntensity = mix(lerp2, lerp1, (dist-0.4)*10.0);\n\
 		} else {\n\
-			gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff, shadOff*4.0));\n\
+			shadIntensity = shadowLerp(lightDSampler, vec2(2048.0, 2048.0), lightDist.xy, lightDist.z-shadOff, shadOff*0.5);\n\
 		}\n\
+		shadIntensity = min(shadIntensity, max(0.0, dot(normalize(normal), lightDir) * 5.0));\n\
+		gl_FragColor = col*mix(vec4(0.5, 0.5, 0.7, 1.0), vec4(1.0, 1.0, 1.0, 1.0), min(1.0, shadIntensity + shadLighten));\n\
 		\n\
 		if (gl_FragColor.a == 0.0) discard;\n\
 	}\n\
@@ -144,6 +150,7 @@ window.nitroShaders = new (function() {
 	uniform mat4 uPMatrix;\n\
 	uniform mat3 texMatrix;\n\
 	uniform mat4 matStack[16];\n\
+	uniform float normalFlip;\n\
 	\n\
 	uniform vec4 colMult;\n\
 	\n\
@@ -155,6 +162,7 @@ window.nitroShaders = new (function() {
 	varying vec4 color;\n\
 	varying vec4 lightDist;\n\
 	varying vec4 fLightDist;\n\
+	varying vec3 normal;\n\
 	\n\
 	\n\
 	void main(void) {\n\
@@ -164,7 +172,8 @@ window.nitroShaders = new (function() {
 		\n\
 		lightDist = (shadowMat*pos + vec4(1, 1, 1, 0)) / 2.0;\n\
 		fLightDist = (farShadowMat*pos + vec4(1, 1, 1, 0)) / 2.0;\n\
-		vec3 adjNorm = normalize(vec3(uMVMatrix * matStack[int(matrixID)] * vec4(aNormal, 0.0)));\n\
+		vec3 adjNorm = normalize(vec3(uMVMatrix * matStack[int(matrixID)] * vec4(aNormal, 0.0))) * normalFlip;\n\
+		normal = adjNorm; \n\
 		float diffuse = (1.0-lightIntensity)-dot(adjNorm, vec3(0.0, -1.0, 0.0))*lightIntensity;\n\
 		\n\
 		color = aColor*colMult;\n\
@@ -303,12 +312,15 @@ window.nitroShaders = new (function() {
 		["shadowMatUniform", "shadowMat"],
 		["farShadowMatUniform", "farShadowMat"],
 		["lightIntensityUniform", "lightIntensity"],
+		["shadLightenUniform", "shadLighten"],
+		["lightDirUniform", "lightDir"],
+		["normalFlipUniform", "normalFlip"],
 
 		["shadOffUniform", "shadOff"],
 		["farShadOffUniform", "farShadOff"],
 
 		["lightSamplerUniform", "lightDSampler"],
-		["farLightSamplerUniform", "farLightDSampler"]
+		["farLightSamplerUniform", "farLightDSampler"],
 	]
 
 	config[0] = baseConf;

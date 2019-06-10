@@ -52,16 +52,16 @@ window.singleScene = function(course, wsInstance, res) {
 		var mainNarc, texNarc
 		if (course.substr(0, 5) == "mkds/") {
 			var cnum = Number(course.substr(5));
-			var music = MKDSCONST.COURSE_MUSIC[cnum];
-			var cDir = MKDSCONST.COURSEDIR+MKDSCONST.COURSES[cnum];
+			var course = MKDSCONST.COURSES[cnum];
+			var cDir = MKDSCONST.COURSEDIR+course.name;
 			var mainNarc = new narc(lz77.decompress(gameROM.getFile(cDir+".carc")));
 			var texNarc = new narc(lz77.decompress(gameROM.getFile(cDir+"Tex.carc")));
-			setUpCourse(mainNarc, texNarc, music)
+			setUpCourse(mainNarc, texNarc, course)
 		} else throw "custom tracks are not implemented yet!"
 	}
 
 
-	function setUpCourse(mainNarc, texNarc, music) {
+	function setUpCourse(mainNarc, texNarc, course) {
 		var chars = [];
 		chars.push({charN:mchar, kartN:mkart, controller:((window.prompt("press y for cpu controlled") == "y")?controlRaceCPU:controlDefault), raceCam:true, extraParams:[{k:"name", v:"single"}, {k:"active", v:true}]});
 
@@ -72,7 +72,7 @@ window.singleScene = function(course, wsInstance, res) {
 			chars.push({charN:tchar, kartN:tkart, controller:controlRaceCPU, raceCam:false, extraParams:[{k:"name", v:"no"}, {k:"active", v:true}]});
 		}
 
-		t.activeScene = new courseScene(mainNarc, texNarc, music, chars, {}, res);
+		t.activeScene = new courseScene(mainNarc, texNarc, course, chars, {}, res);
 
 		t.myKart = t.activeScene.karts[0];
 		t.mode = {

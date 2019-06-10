@@ -322,9 +322,9 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		k.items.update(input);
 
 		if (input.turn > 0.3) {
-			if (k.driveAnimF < 28) k.driveAnimF++;
-		} else if (input.turn < -0.3) {
 			if (k.driveAnimF > 0) k.driveAnimF--;
+		} else if (input.turn < -0.3) {
+			if (k.driveAnimF < 28) k.driveAnimF++;
 		} else {
 			if (k.driveAnimF > 14) k.driveAnimF--;
 			else if (k.driveAnimF < 14) k.driveAnimF++;
@@ -725,8 +725,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			}
 			var velSeg = vec3.clone(baseVel);
 			if (k.kartColTimer > 0) {
-				vec3.scale([], k.kartColVel, k.kartColTimer/COLBOUNCE_TIME);
-				vec3.add(velSeg, velSeg, k.kartColVel);
+				vec3.add(velSeg, velSeg, vec3.scale([], k.kartColVel, k.kartColTimer/COLBOUNCE_TIME));
 			}
 			var posSeg = vec3.clone(k.pos);
 			var ignoreList = [];
@@ -1046,7 +1045,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 		//order y, x, z
 		var dir = k.physicalDir+k.driftOff+(Math.sin((COLBOUNCE_TIME-k.kartColTimer)/3)*(Math.PI/6)*(k.kartColTimer/COLBOUNCE_TIME));
 		var forward = [Math.sin(dir), 0, -Math.cos(dir)];
-		var side = [Math.cos(dir), 0, Math.sin(dir)];
+		var side = [-Math.cos(dir), 0, -Math.sin(dir)];
 		if (k.physBasis != null) {
 			vec3.transformMat4(forward, forward, k.physBasis.mat);
 			vec3.transformMat4(side, side, k.physBasis.mat);
