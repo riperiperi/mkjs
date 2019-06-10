@@ -36,15 +36,21 @@ window.nitroAudio = new (function() {
 
 	function updateListener(pos, view) {
 		var listener = ctx.listener;
-		listener.positionX.value = pos[0];
-		listener.positionY.value = pos[1];
-		listener.positionZ.value = pos[2];
-		listener.forwardX.value = view[8];
-		listener.forwardY.value = -view[9];
-		listener.forwardZ.value = -view[10];
-		listener.upX.value = view[4];
-		listener.upY.value = view[5];
-		listener.upZ.value = view[6];
+		if (listener.positionX == null) {
+			//use old setters. safari ios
+			listener.setPosition(pos[0], pos[1], pos[2]);
+			listener.setOrientation(view[8], -view[9], -view[10], view[4], view[5], view[6]);
+		} else {
+			listener.positionX.value = pos[0];
+			listener.positionY.value = pos[1];
+			listener.positionZ.value = pos[2];
+			listener.forwardX.value = view[8];
+			listener.forwardY.value = -view[9];
+			listener.forwardZ.value = -view[10];
+			listener.upX.value = view[4];
+			listener.upY.value = view[5];
+			listener.upZ.value = view[6];
+		}
 	}
 
 	function tick() {
