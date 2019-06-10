@@ -17,7 +17,7 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	var kartSoundBase = 170;
 
 	var COLBOUNCE_TIME = 20;
-	var COLBOUNCE_STRENGTH = 1;
+	var COLBOUNCE_STRENGTH = 4;
 
 	var params = scene.gameRes.kartPhys.karts[kartN];
 	var offsets = scene.gameRes.kartOff.karts[kartN];
@@ -670,9 +670,11 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 					k.ylock += ylvel;
 				}
 
+				/*
 				if (k.kartColTimer == COLBOUNCE_TIME) {
 					vec3.add(k.vel, k.vel, k.kartColVel);
 				}
+				*/
 			} else {
 				k.angle += dirDiff(k.physicalDir, k.angle)*effect.handling;
 				k.angle += dirDiff(k.physicalDir, k.angle)*effect.handling; //applying this twice appears to be identical to the original
@@ -687,9 +689,11 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				k.vel = [Math.sin(k.angle)*k.speed, k.vel[1], -Math.cos(k.angle)*k.speed]
 				//k.speed = reducedSpeed;
 
+				/*
 				if (k.kartColTimer > 0) {
 					vec3.add(k.vel, k.vel, vec3.scale([], k.kartColVel, k.kartColTimer/10))
 				}
+				*/
 			}
 
 			if (k.kartColTimer > 0) k.kartColTimer--;
@@ -720,6 +724,10 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 				}
 			}
 			var velSeg = vec3.clone(baseVel);
+			if (k.kartColTimer > 0) {
+				vec3.scale([], k.kartColVel, k.kartColTimer/COLBOUNCE_TIME);
+				vec3.add(velSeg, velSeg, k.kartColVel);
+			}
 			var posSeg = vec3.clone(k.pos);
 			var ignoreList = [];
 			while (steps++ < 10 && remainingT > 0.01) {
@@ -976,7 +984,6 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 			if (k != ok) {
 				var dist = vec3.dist(k.pos, ok.pos);
 				if (dist < 16) {
-					nitroAudio.playSound(208, { volume: 2 }, 0, k);
 					kartBounce(ok);
 					ok.kartBounce(k);
 				}
@@ -986,21 +993,24 @@ window.Kart = function(pos, angle, speed, kartN, charN, controller, scene) {
 	}
 
 	function kartBounce(ok) {
+		//play this kart's horn
+		if (k.kartColTimer == 0) { //not if we're still being bounced
+			nitroAudio.playSound(208, { volume: 2 }, 0, k);
+			nitroAudio.playSound(193 + charRes.sndOff/14, { volume: 1.5 }, 0, k);
+		}
+
 		k.kartColTimer = COLBOUNCE_TIME;
-		var weightMul = COLBOUNCE_STRENGTH*(1+(ok.weight-k.weight))*((ok.boostNorm>0 || ok.boostMT>0)?2:1)*((k.boostNorm>0 || k.boostMT>0)?0.5:1);
+		var weightMul = COLBOUNCE_STRENGTH*(1.5+(ok.weight-k.weight))*((ok.boostNorm>0 || ok.boostMT>0)?2:1)*((k.boostNorm>0 || k.boostMT>0)?0.5:1);
 
 		//as well as side bounce also add velocity difference if other vel > mine.
 
 		vec3.sub(k.kartColVel, k.pos, ok.pos);
-		k.kartColVel[1] = 0;
 		vec3.normalize(k.kartColVel, k.kartColVel);
 		vec3.scale(k.kartColVel, k.kartColVel, weightMul);
 
 		if (vec3.length(k.vel) < vec3.length(ok.vel)) vec3.add(k.kartColVel, k.kartColVel, vec3.sub([], ok.vel, k.vel));
 
 		k.kartColVel[1] = 0;
-		//play this kart's horn
-		nitroAudio.playSound(193 + charRes.sndOff/14, { volume: 2 }, 0, k);
 	}
 
 	function fixDir(dir) {
