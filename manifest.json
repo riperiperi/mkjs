@@ -1,0 +1,29 @@
+{
+    "name": "mkjs",
+    "display": "fullscreen",
+    "orientation": "landscape",
+    "background_color": "black",
+
+    "icons": [
+    {
+      "src": "/resource/icon-512-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "/resource/icon-192-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/resource/icon-180-180.png",
+      "type": "image/png",
+      "sizes": "180x180"
+    },
+    {
+      "src": "/resource/icon-120-120.png",
+      "type": "image/png",
+      "sizes": "120x120"
+    }
+  ]
+}
