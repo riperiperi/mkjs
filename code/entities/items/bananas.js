@@ -120,7 +120,7 @@ window.BombC = function(item, scene, type) {
     this.canBeDropped = true;
     this.isDestructive = true;
 
-    this.isExploding = false;
+    this.explodeTime = 0;
 
     this.collideKart = collideKart;
     this.onRest = onRest;
@@ -135,6 +135,10 @@ window.BombC = function(item, scene, type) {
     }
 
     function update(argument) {
+        if (item.deadTimer > 0 && t.explodeTime == 0) {
+            //begin explosion
+            t.explodeTime = 1;
+        }
         if (!item.held && item.colRadius < 6) {
             item.colRadius += 0.2;
             if (item.colRadius > 6) item.colRadius = 6;

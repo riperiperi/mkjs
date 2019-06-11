@@ -101,7 +101,7 @@ window.clientScene = function(wsUrl, wsInstance, res) {
 	wsH["$+"] = function(obj) { //add kart. only used in debug circumstances. (people can't join normal gamemodes midgame)
 		console.log("kart added");
 		if (t.mode != 1) return;
-		var kart = new Kart([0, -2000, 0], 0, 0, obj.k.kart, obj.k.char, new ((obj.p)?((window.prompt("press y for cpu controlled") == "y")?controlRaceCPU:controlDefault):controlNetwork)(t.activeScene.nkm, {}), t.activeScene);
+		var kart = new Kart([0, -2000, 0], 0, 0, obj.k.kart, obj.k.char, new ((obj.p)?((window.prompt("press y for cpu controlled") == "y")?controlRaceCPU:getPlayerControls()):controlNetwork)(t.activeScene.nkm, {}), t.activeScene);
 		t.activeScene.karts.push(kart);
 	}
 
@@ -130,7 +130,7 @@ window.clientScene = function(wsUrl, wsInstance, res) {
 			var k = obj.k[i];
 			var pKart = (i == obj.p);
 			//TODO: custom character support
-			chars.push({charN:k.char, kartN:k.kart, controller:((pKart)?((window.prompt("press y for cpu controlled") == "y")?controlRaceCPU:controlDefault):controlNetwork), raceCam:pKart, extraParams:[{k:"name", v:k.name}, {k:"active", v:k.active}]});
+			chars.push({charN:k.char, kartN:k.kart, controller:((pKart)?((window.prompt("press y for cpu controlled") == "y")?controlRaceCPU:getPlayerControls()):controlNetwork), raceCam:pKart, extraParams:[{k:"name", v:k.name}, {k:"active", v:k.active}]});
 		
 			if (pKart) {
 				for (var i=0; i<7; i++) {

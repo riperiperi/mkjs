@@ -79,6 +79,7 @@ window.GreenShellC = function(item, scene) {
 			//sliding plane
 			var proj = vec3.dot(item.vel, n);
 			vec3.sub(item.vel, item.vel, vec3.scale(vec3.create(), n, proj));
+			item.stuckTo = dat.object;
 		} else {
 			adjustPos = false;
 			ignoreList.push(plane);
