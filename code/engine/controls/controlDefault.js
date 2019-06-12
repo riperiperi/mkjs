@@ -107,8 +107,8 @@ window.controlMobile = function() {
 				if (dPadTouch != null) {
 					//set direction based on flick direction or position
 					var vel = dPadTouch.touch.lasty - dPadTouch.touch.y;
-					if (vel > 5/targH) itemDir = -1; //flicked down
-					if (vel < -5/targH) itemDir = 1; //flicked up
+					if (vel > 2/targH) itemDir = -1; //flicked down
+					if (vel < -2/targH) itemDir = 1; //flicked up
 				}
 				item = false;
 			}
